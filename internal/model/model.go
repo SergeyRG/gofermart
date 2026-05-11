@@ -77,3 +77,12 @@ type Order struct {
 	Accrual MoneyQty
 	AddedAt time.Time
 }
+
+func NewOrder(ID OrderID, userID UserID) Order {
+	return Order{
+		ID:      ID,
+		UserID:  userID,
+		Status:  StatusNew,
+		AddedAt: time.Now().UTC(),
+	}
+}

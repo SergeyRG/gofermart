@@ -11,12 +11,31 @@ type OrderService interface {
 	Get(context.Context, model.UserID) ([]model.Order, error)
 }
 
-type OrderServiceImpl struct{}
+type OrderRepo interface {
+	GetByID(context.Context, model.OrderID) (model.Order, error)
+	Add(context.Context, model.Order) error
+}
 
-func (svc OrderServiceImpl) Add(context.Context, model.UserID, model.OrderID) error {
-	return nil
+type AccrualClient interface {
+	GetAccrual(ctx context.Context, orderID string)
+}
+
+type OrderServiceImpl struct {
+	orderRepo OrderRepo
+}
+
+func (svc OrderServiceImpl) Add(ctx context.Context, userID model.UserID, orderID model.OrderID) error {
+	order := model.NewOrder(orderID, userID)
+
+	return svc.orderRepo.Add(ctx, order)
 }
 
 func (svc OrderServiceImpl) Get(context.Context, model.UserID) ([]model.Order, error) {
 	return make([]model.Order, 0), nil
+}
+
+func NewOrderService(repo OrderRepo) OrderServiceImpl {
+	return OrderServiceImpl{
+		orderRepo: repo,
+	}
 }

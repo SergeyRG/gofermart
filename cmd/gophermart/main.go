@@ -9,6 +9,7 @@ import (
 	"github.com/SergeyRG/gofermart/internal/handlers"
 	"github.com/SergeyRG/gofermart/internal/logging"
 	"github.com/SergeyRG/gofermart/internal/model"
+	"github.com/SergeyRG/gofermart/internal/repositories"
 	"github.com/SergeyRG/gofermart/internal/services"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -34,8 +35,9 @@ func main() {
 	}
 	l.Info("конфигурационная информация прочитана")
 
-	//Создаем сервис обработки заказов
-	orderSvc := services.OrderServiceImpl{}
+	//Создание сервиса обработки заказов
+	orderRepo := repositories.NewPSQLOrderRepo(nil) //TODO
+	orderSvc := services.NewOrderService(orderRepo)
 
 	if err := run(cfg, orderSvc); err != nil {
 		log.Fatalf("ошибка запуска приложения: %v", err)
