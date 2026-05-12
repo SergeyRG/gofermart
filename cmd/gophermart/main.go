@@ -8,6 +8,7 @@ import (
 	"github.com/SergeyRG/gofermart/internal/config"
 	"github.com/SergeyRG/gofermart/internal/handlers"
 	"github.com/SergeyRG/gofermart/internal/logging"
+	"github.com/SergeyRG/gofermart/internal/migrations"
 	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/repositories"
 	"github.com/SergeyRG/gofermart/internal/services"
@@ -35,8 +36,20 @@ func main() {
 	}
 	l.Info("конфигурационная информация прочитана")
 
+	l.Info("Обновление БД")
+	err = migrations.RunMigrations(cfg.DBDSN)
+	if err != nil {
+		l.Fatal(
+			"Сбой запуска приложения, не удалось миграцию схемы БД", zap.Error(err))
+	}
+	l.Info("Обновление БД завершено")
+
 	//Создание сервиса обработки заказов
-	orderRepo := repositories.NewPSQLOrderRepo(nil) //TODO
+	orderRepo, err := repositories.NewPSQLOrderRepo(cfg.DBDSN)
+	if err != nil {
+		l.Fatal(
+			"Ошибка подключения к БД", zap.Error(err))
+	}
 	orderSvc := services.NewOrderService(orderRepo)
 
 	if err := run(cfg, orderSvc); err != nil {

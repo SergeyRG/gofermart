@@ -2,9 +2,18 @@ package services
 
 import (
 	"context"
+	"errors"
 
 	"github.com/SergeyRG/gofermart/internal/model"
 )
+
+// Ошибки работы с репозиторием
+var ErrOrderAlreadyExist = errors.New(
+	"заказ с данным идентификатором уже зарегистрирован в системе")
+var ErrOrderAlreadyAddedByAnotherUser = errors.New(
+	"заказ с данным идентификатором уже зарегистрирован в системе другим пользователем")
+var ErrUndefinedRepositoryError = errors.New(
+	"непредвиденная ошибка работы с БД")
 
 type OrderService interface {
 	Add(context.Context, model.UserID, model.OrderID) error

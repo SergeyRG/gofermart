@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -44,12 +45,20 @@ func (h OrderHandler) AddNewOrder() http.HandlerFunc {
 
 		err = h.svc.Add(r.Context(), userID, orderID)
 		if err != nil {
+			if errors.Is(err, services.ErrOrderAlreadyExist) {
+				rw.WriteHeader(http.StatusOK)
+				return
+			}
+			if errors.Is(err, services.ErrOrderAlreadyAddedByAnotherUser) {
+				rw.WriteHeader(http.StatusConflict)
+				return
+			}
+
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		rw.WriteHeader(http.StatusAccepted)
-		rw.Write([]byte("{\"status\": \"OK\"}"))
 	}
 	return http.HandlerFunc(hf)
 }
