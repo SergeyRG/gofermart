@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -43,7 +44,7 @@ func (h OrderHandler) AddNewOrder() http.HandlerFunc {
 			return
 		}
 
-		err = h.svc.Add(r.Context(), userID, orderID)
+		err = h.svc.AddOrder(r.Context(), userID, orderID)
 		if err != nil {
 			if errors.Is(err, services.ErrOrderAlreadyExist) {
 				rw.WriteHeader(http.StatusOK)
@@ -59,6 +60,37 @@ func (h OrderHandler) AddNewOrder() http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusAccepted)
+	}
+	return http.HandlerFunc(hf)
+}
+
+func (h OrderHandler) GetUserOrders() http.HandlerFunc {
+	hf := func(rw http.ResponseWriter, r *http.Request) {
+		userID := model.UserID(1) // TODO
+
+		defer r.Body.Close()
+
+		orders, err := h.svc.GetUserOrders(r.Context(), userID)
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if len(orders) == 0 {
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		ordersJSON, err := json.Marshal(orders)
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		rw.Write(ordersJSON)
+
 	}
 	return http.HandlerFunc(hf)
 }

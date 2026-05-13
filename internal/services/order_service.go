@@ -16,12 +16,12 @@ var ErrUndefinedRepositoryError = errors.New(
 	"непредвиденная ошибка работы с БД")
 
 type OrderService interface {
-	Add(context.Context, model.UserID, model.OrderID) error
-	Get(context.Context, model.UserID) ([]model.Order, error)
+	AddOrder(context.Context, model.UserID, model.OrderID) error
+	GetUserOrders(context.Context, model.UserID) ([]model.Order, error)
 }
 
 type OrderRepo interface {
-	GetByID(context.Context, model.OrderID) (model.Order, error)
+	GetByUserID(context.Context, model.UserID) ([]model.Order, error)
 	Add(context.Context, model.Order) error
 }
 
@@ -33,14 +33,14 @@ type OrderServiceImpl struct {
 	orderRepo OrderRepo
 }
 
-func (svc OrderServiceImpl) Add(ctx context.Context, userID model.UserID, orderID model.OrderID) error {
+func (svc OrderServiceImpl) AddOrder(ctx context.Context, userID model.UserID, orderID model.OrderID) error {
 	order := model.NewOrder(orderID, userID)
 
 	return svc.orderRepo.Add(ctx, order)
 }
 
-func (svc OrderServiceImpl) Get(context.Context, model.UserID) ([]model.Order, error) {
-	return make([]model.Order, 0), nil
+func (svc OrderServiceImpl) GetUserOrders(ctx context.Context, userID model.UserID) ([]model.Order, error) {
+	return svc.orderRepo.GetByUserID(ctx, userID)
 }
 
 func NewOrderService(repo OrderRepo) OrderServiceImpl {

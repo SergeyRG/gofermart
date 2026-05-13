@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -71,11 +72,34 @@ type User struct {
 }
 
 type Order struct {
-	ID      OrderID
-	UserID  UserID
-	Status  OrderStatus
-	Accrual MoneyQty
-	AddedAt time.Time
+	ID      OrderID     `json:"number"`
+	UserID  UserID      `json:"-"`
+	Status  OrderStatus `json:"status"`
+	Accrual MoneyQty    `json:"accrual"`
+	AddedAt time.Time   `json:"uploaded_at"`
+}
+
+func (o Order) MarshalJSON() ([]byte, error) {
+	type OrderCopy Order
+
+	var accrual *MoneyQty = nil
+
+	if o.Status == StatusProcessed {
+		accrual = &o.Accrual
+	}
+
+	jsonStruct := struct {
+		ID      OrderID     `json:"number"`
+		Status  OrderStatus `json:"status"`
+		Accrual *MoneyQty   `json:"accrual,omitempty"`
+		AddedAt time.Time   `json:"uploaded_at"`
+	}{
+		ID:      o.ID,
+		Status:  o.Status,
+		Accrual: accrual,
+		AddedAt: o.AddedAt,
+	}
+	return json.Marshal(jsonStruct)
 }
 
 func NewOrder(ID OrderID, userID UserID) Order {

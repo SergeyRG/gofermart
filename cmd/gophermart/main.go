@@ -32,7 +32,7 @@ func main() {
 	cfg, err := config.NewConfig()
 	if err != nil {
 		l.Fatal(
-			"Сбой запуска приложения, не удалось ошибка конфигурации", zap.Error(err))
+			"Сбой запуска приложения, ошибка конфигурации", zap.Error(err))
 	}
 	l.Info("конфигурационная информация прочитана")
 
@@ -76,7 +76,7 @@ func run(cfg config.Config, orderSvc services.OrderService) error {
 		// 	r.Get("/ping/", DBPingHandler)
 		// 	r.Post("/api/shorten", JSONShortenHandler)
 		r.Post("/api/user/orders", OrderHandler.AddNewOrder())
-		// 	r.Get("/api/user/urls", UserURLHandler)
+		r.Get("/api/user/orders", OrderHandler.GetUserOrders())
 		// 	r.Delete("/api/user/urls", UserBatchDeleteHandler)
 	})
 

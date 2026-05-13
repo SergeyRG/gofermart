@@ -70,6 +70,35 @@ func (repo PSQLOrderRepo) Add(ctx context.Context, order model.Order) error {
 	}
 }
 
-func (repo PSQLOrderRepo) GetByID(ctx context.Context, order model.OrderID) (model.Order, error) {
-	return model.Order{}, nil
+func (repo PSQLOrderRepo) GetByUserID(ctx context.Context, userID model.UserID) ([]model.Order, error) {
+	query := `SELECT id, status, accrual, added_at
+			FROM orders
+			WHERE user_id = $1
+			ORDER BY added_at DESC`
+
+	orders := make([]model.Order, 0)
+
+	sqlResults, err := repo.db.QueryContext(ctx, query, userID)
+
+	if err != nil {
+		return nil, fmt.Errorf(
+			"ошибка выполнения SQL запроса: %w", err)
+	}
+	defer sqlResults.Close()
+
+	for sqlResults.Next() {
+		o := model.Order{}
+		err = sqlResults.Scan(&o.ID, &o.Status, &o.Accrual, &o.AddedAt)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"ошибка парсинга результата SQL запроса: %w", err)
+		}
+		orders = append(orders, o)
+	}
+
+	if err = sqlResults.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка парсинга результата SQL запроса: %w", err)
+	}
+
+	return orders, nil
 }
