@@ -1,0 +1,6 @@
+CREATE TABLE balances (
+    pk SERIAL PRIMARY KEY,
+    user_id BIGINT UNIQUE NOT NULL,
+    current BIGINT NOT NULL DEFAULT 0,
+    withdrawn BIGINT NOT NULL DEFAULT 0
+);

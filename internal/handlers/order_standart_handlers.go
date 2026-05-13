@@ -11,15 +11,7 @@ import (
 	"github.com/SergeyRG/gofermart/internal/services"
 )
 
-type OrderHandler struct {
-	svc services.OrderService
-}
-
-func NewOrderHandler(svc services.OrderService) OrderHandler {
-	return OrderHandler{svc: svc}
-}
-
-func (h OrderHandler) AddNewOrder() http.HandlerFunc {
+func (h StandartHandlers) AddNewOrder() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID := model.UserID(1) // TODO
 
@@ -44,7 +36,7 @@ func (h OrderHandler) AddNewOrder() http.HandlerFunc {
 			return
 		}
 
-		err = h.svc.AddOrder(r.Context(), userID, orderID)
+		err = h.orderSvc.AddOrder(r.Context(), userID, orderID)
 		if err != nil {
 			if errors.Is(err, services.ErrOrderAlreadyExist) {
 				rw.WriteHeader(http.StatusOK)
@@ -64,13 +56,13 @@ func (h OrderHandler) AddNewOrder() http.HandlerFunc {
 	return http.HandlerFunc(hf)
 }
 
-func (h OrderHandler) GetUserOrders() http.HandlerFunc {
+func (h StandartHandlers) GetUserOrders() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID := model.UserID(1) // TODO
 
 		defer r.Body.Close()
 
-		orders, err := h.svc.GetUserOrders(r.Context(), userID)
+		orders, err := h.orderSvc.GetUserOrders(r.Context(), userID)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return

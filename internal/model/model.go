@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -21,8 +22,9 @@ const (
 type UserID int64
 type MoneyQty int64
 
-func (m MoneyQty) ToFloat() float64 {
-	return float64(m) / 100.0
+func (m MoneyQty) MarshalJSON() ([]byte, error) {
+	floatValue := float64(m) / 100.0
+	return []byte(fmt.Sprintf("%.2f", floatValue)), nil
 }
 
 type OrderID string
@@ -109,4 +111,10 @@ func NewOrder(ID OrderID, userID UserID) Order {
 		Status:  StatusNew,
 		AddedAt: time.Now().UTC(),
 	}
+}
+
+type Balance struct {
+	UserID    UserID   `json:"-"`
+	Current   MoneyQty `json:"current"`
+	Withdrawn MoneyQty `json:"withdrawn"`
 }

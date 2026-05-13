@@ -52,31 +52,34 @@ func main() {
 	}
 	orderSvc := services.NewOrderService(orderRepo)
 
-	if err := run(cfg, orderSvc); err != nil {
+	balanceRepo, err := repositories.NewPSQLBalanceRepo(cfg.DBDSN)
+	if err != nil {
+		l.Fatal(
+			"Ошибка подключения к БД", zap.Error(err))
+	}
+	balanceSvc := services.NewBalanceService(balanceRepo)
+
+	if err := run(cfg, orderSvc, balanceSvc); err != nil {
 		log.Fatalf("ошибка запуска приложения: %v", err)
 	}
 }
 
-func run(cfg config.Config, orderSvc services.OrderService) error {
+func run(cfg config.Config, orderSvc services.OrderService, balanceSvc services.BalanceService) error {
 	l := logging.Logger
 	l.Info("Инициализация http сервера")
 
 	r := chi.NewRouter()
 
-	OrderHandler := handlers.NewOrderHandler(orderSvc)
+	StandartHandlers := handlers.NewStandartHandlers(orderSvc, balanceSvc)
 
 	r.Route("/", func(r chi.Router) {
 		// 	r.Use(logging.WithLogging)
 		// 	r.Use(authMiddleware)
 		// 	r.Use(middleware.GzipMiddleware)
-		// 	r.Post("/", rootHandler)
 		// 	r.Get("/{id}", redirectHandler)
-		// 	r.Get("/{id}/", redirectHandler)
-		// 	r.Get("/ping", DBPingHandler)
-		// 	r.Get("/ping/", DBPingHandler)
-		// 	r.Post("/api/shorten", JSONShortenHandler)
-		r.Post("/api/user/orders", OrderHandler.AddNewOrder())
-		r.Get("/api/user/orders", OrderHandler.GetUserOrders())
+		r.Get("/api/user/balance", StandartHandlers.GetUserBalance())
+		r.Post("/api/user/orders", StandartHandlers.AddNewOrder())
+		r.Get("/api/user/orders", StandartHandlers.GetUserOrders())
 		// 	r.Delete("/api/user/urls", UserBatchDeleteHandler)
 	})
 
