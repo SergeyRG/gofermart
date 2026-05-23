@@ -1,9 +1,12 @@
 package model
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 )
 
@@ -13,13 +16,21 @@ var ErrInvalidOrderID = errors.New(
 type OrderStatus string
 
 const (
-	StatusNew        OrderStatus = "NEW"        // заказ принят, но не обработан
-	StatusProcessing OrderStatus = "PROCESSING" // расчет в процессе
-	StatusInvalid    OrderStatus = "INVALID"    // система расчета признала номер неверным
-	StatusProcessed  OrderStatus = "PROCESSED"  // расчет завершен
+	StatusNew        OrderStatus = "NEW"
+	StatusProcessing OrderStatus = "PROCESSING"
+	StatusInvalid    OrderStatus = "INVALID"
+	StatusProcessed  OrderStatus = "PROCESSED"
+)
+
+type OperationType string
+
+const (
+	OperationWithdraw OperationType = "WITHDRAW"
+	OperationDeposit  OperationType = "DEPOSIT"
 )
 
 type UserID int64
+
 type MoneyQty int64
 
 func (m MoneyQty) MarshalJSON() ([]byte, error) {
@@ -27,7 +38,26 @@ func (m MoneyQty) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%.2f", floatValue)), nil
 }
 
+func (m *MoneyQty) UnmarshalJSON(data []byte) error {
+	val, err := strconv.ParseFloat(string(data), 64)
+	if err != nil {
+		return fmt.Errorf("невалидное число: %w", err)
+	}
+
+	*m = MoneyQty(math.Round(val * 100))
+	return nil
+}
+
 type OrderID string
+
+func (o *OrderID) UnmarshalJSON(data []byte) error {
+	orderID, err := NewOrderID(string(bytes.Trim(data, "\"")))
+	if err != nil {
+		return err
+	}
+	*o = orderID
+	return nil
+}
 
 func (ID OrderID) isValid() bool {
 	var sum int
@@ -74,11 +104,12 @@ type User struct {
 }
 
 type Order struct {
-	ID      OrderID     `json:"number"`
-	UserID  UserID      `json:"-"`
-	Status  OrderStatus `json:"status"`
-	Accrual MoneyQty    `json:"accrual"`
-	AddedAt time.Time   `json:"uploaded_at"`
+	ID        OrderID     `json:"number"`
+	UserID    UserID      `json:"-"`
+	Status    OrderStatus `json:"status"`
+	Accrual   MoneyQty    `json:"accrual"`
+	AddedAt   time.Time   `json:"uploaded_at"`
+	UpdatedAt time.Time   `json:"-"`
 }
 
 func (o Order) MarshalJSON() ([]byte, error) {
@@ -106,10 +137,11 @@ func (o Order) MarshalJSON() ([]byte, error) {
 
 func NewOrder(ID OrderID, userID UserID) Order {
 	return Order{
-		ID:      ID,
-		UserID:  userID,
-		Status:  StatusNew,
-		AddedAt: time.Now().UTC(),
+		ID:        ID,
+		UserID:    userID,
+		Status:    StatusNew,
+		AddedAt:   time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 }
 
@@ -118,3 +150,31 @@ type Balance struct {
 	Current   MoneyQty `json:"current"`
 	Withdrawn MoneyQty `json:"withdrawn"`
 }
+
+type Operation struct {
+	UserID      UserID        `json:"-"`
+	OrderID     OrderID       `json:"order"`
+	Sum         MoneyQty      `json:"sum"`
+	OpType      OperationType `json:"-"`
+	ProcessedAt time.Time     `json:"processed_at"`
+}
+
+// func NewOperation(userID UserID,
+// 	orderID string,
+// 	sum string,
+// 	opType string,
+// 	processedAt *time.Time) (*Operation, error) {
+
+// 	orderIDVerified, err := NewOrderID(orderID)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("ошибка проверки данных: %w", err)
+// 	}
+
+// 	return &Operation{
+// 		UserID:      userID,
+// 		OrderID:     orderIDVerified,
+// 		Sum:         sum,
+// 		OpType:      opType,
+// 		ProcessedAt: *processedAt,
+// 	}, nil
+// }

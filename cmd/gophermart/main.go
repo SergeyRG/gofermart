@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/SergeyRG/gofermart/internal/clients"
 	"github.com/SergeyRG/gofermart/internal/config"
 	"github.com/SergeyRG/gofermart/internal/handlers"
 	"github.com/SergeyRG/gofermart/internal/logging"
@@ -14,6 +16,7 @@ import (
 	"github.com/SergeyRG/gofermart/internal/services"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 var USERID model.UserID
@@ -45,22 +48,40 @@ func main() {
 	l.Info("Обновление БД завершено")
 
 	//Создание сервиса обработки заказов
-	orderRepo, err := repositories.NewPSQLOrderRepo(cfg.DBDSN)
+	db, err := repositories.CreateAndCheckPSQLCon(cfg.DBDSN)
 	if err != nil {
 		l.Fatal(
 			"Ошибка подключения к БД", zap.Error(err))
 	}
-	orderSvc := services.NewOrderService(orderRepo)
+	txManager := repositories.NewTXManager(db)
 
-	balanceRepo, err := repositories.NewPSQLBalanceRepo(cfg.DBDSN)
-	if err != nil {
-		l.Fatal(
-			"Ошибка подключения к БД", zap.Error(err))
+	orderRepo := repositories.NewPSQLOrderRepo(db)
+	orderSvc := services.NewOrderService(orderRepo, txManager)
+
+	balanceRepo := repositories.NewPSQLBalanceRepo(db)
+	balanceSvc := services.NewBalanceService(balanceRepo, txManager)
+
+	accrualHTTPClient := clients.NewRestyAccrualClient(cfg)
+	accrualSvc := services.NewAccrualService(txManager, orderSvc, balanceSvc, accrualHTTPClient)
+
+	g, gCtx := errgroup.WithContext(context.Background())
+
+	for workerID := range orderSvc.WorkersCount {
+		g.Go(func() error {
+			return accrualSvc.RunWorker(gCtx, workerID)
+		})
 	}
-	balanceSvc := services.NewBalanceService(balanceRepo)
 
-	if err := run(cfg, orderSvc, balanceSvc); err != nil {
-		log.Fatalf("ошибка запуска приложения: %v", err)
+	g.Go(func() error {
+		if err := run(cfg, orderSvc, balanceSvc); err != nil {
+			l.Error("ошибка запуска приложения", zap.Error(err))
+			return err
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		l.Fatal("критическая ошибка, повлекшая остановку приложения.", zap.Error(err))
 	}
 }
 
@@ -73,14 +94,14 @@ func run(cfg config.Config, orderSvc services.OrderService, balanceSvc services.
 	StandartHandlers := handlers.NewStandartHandlers(orderSvc, balanceSvc)
 
 	r.Route("/", func(r chi.Router) {
-		// 	r.Use(logging.WithLogging)
 		// 	r.Use(authMiddleware)
 		// 	r.Use(middleware.GzipMiddleware)
 		// 	r.Get("/{id}", redirectHandler)
 		r.Get("/api/user/balance", StandartHandlers.GetUserBalance())
 		r.Post("/api/user/orders", StandartHandlers.AddNewOrder())
 		r.Get("/api/user/orders", StandartHandlers.GetUserOrders())
-		// 	r.Delete("/api/user/urls", UserBatchDeleteHandler)
+		r.Post("/api/user/balance/withdraw", StandartHandlers.Withdraw())
+		r.Get("/api/user/withdrawals", StandartHandlers.GetWithdrawals())
 	})
 
 	server := &http.Server{
@@ -95,31 +116,3 @@ func run(cfg config.Config, orderSvc services.OrderService, balanceSvc services.
 	l.Info("Запуск http сервера")
 	return server.ListenAndServe()
 }
-
-// func initRouter() chi.Router {
-
-// 	// redirectHandler := handler.RedirectHandler(svc)
-// 	// JSONShortenHandler := handler.JSONShortenHandler(svc)
-// 	// DBPingHandler := handler.DBPingHandler(db)
-// 	// BatchAddHandler := handler.BatchAddHandler(svc)
-// 	// UserURLHandler := handler.UserURLHandler(svc)
-// 	// UserBatchDeleteHandler := handler.UserBatchDeleteHandler(svc)
-
-// 	// authMiddleware := middleware.Auth(cfg)
-
-// 	// r.Route("/", func(r chi.Router) {
-// 	// 	r.Use(logging.WithLogging)
-// 	// 	r.Use(authMiddleware)
-// 	// 	r.Use(middleware.GzipMiddleware)
-// 	// 	r.Post("/", rootHandler)
-// 	// 	r.Get("/{id}", redirectHandler)
-// 	// 	r.Get("/{id}/", redirectHandler)
-// 	// 	r.Get("/ping", DBPingHandler)
-// 	// 	r.Get("/ping/", DBPingHandler)
-// 	// 	r.Post("/api/shorten", JSONShortenHandler)
-// 	// 	r.Post("/api/shorten/batch", BatchAddHandler)
-// 	// 	r.Get("/api/user/urls", UserURLHandler)
-// 	// 	r.Delete("/api/user/urls", UserBatchDeleteHandler)
-// 	// })
-// 	return chi.NewRouter()
-// }

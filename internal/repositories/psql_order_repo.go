@@ -8,33 +8,30 @@ import (
 
 	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/services"
-	"github.com/SergeyRG/gofermart/internal/storage"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type PSQLOrderRepo struct {
-	db *sql.DB
+	BaseRepository
 }
 
-func NewPSQLOrderRepo(DBDSN string) (*PSQLOrderRepo, error) {
-	db, err := storage.CreateAndCheckPSQLCon(DBDSN)
-	if err != nil {
-		return nil, err
-	}
-	return &PSQLOrderRepo{db: db}, nil
+func NewPSQLOrderRepo(db *sql.DB) *PSQLOrderRepo {
+	return &PSQLOrderRepo{BaseRepository: BaseRepository{db: db}}
 }
 
 func (repo PSQLOrderRepo) Add(ctx context.Context, order model.Order) error {
-	query := `INSERT INTO orders (id, user_id, status, accrual, added_at)
-			VALUES ($1, $2 , $3, $4, $5)`
+	qe := repo.GetExecutor(ctx)
+	query := `INSERT INTO orders (id, user_id, status, accrual, added_at, updated_at)
+			VALUES ($1, $2 , $3, $4, $5, $6)`
 
-	_, err := repo.db.ExecContext(ctx, query,
+	_, err := qe.ExecContext(ctx, query,
 		order.ID,
 		order.UserID,
 		order.Status,
 		order.Accrual,
 		order.AddedAt,
+		order.UpdatedAt,
 	)
 
 	if err == nil {
@@ -55,7 +52,7 @@ func (repo PSQLOrderRepo) Add(ctx context.Context, order model.Order) error {
 	}
 
 	get_user_query := "SELECT user_id FROM orders WHERE id = $1"
-	row := repo.db.QueryRowContext(ctx, get_user_query, order.ID)
+	row := qe.QueryRowContext(ctx, get_user_query, order.ID)
 
 	var existedUserID model.UserID
 	err = row.Scan(&existedUserID)
@@ -71,14 +68,15 @@ func (repo PSQLOrderRepo) Add(ctx context.Context, order model.Order) error {
 }
 
 func (repo PSQLOrderRepo) GetByUserID(ctx context.Context, userID model.UserID) ([]model.Order, error) {
-	query := `SELECT id, status, accrual, added_at
+	qe := repo.GetExecutor(ctx)
+	query := `SELECT id, status, COALESCE(accrual, 0), added_at
 			FROM orders
 			WHERE user_id = $1
 			ORDER BY added_at DESC`
 
 	orders := make([]model.Order, 0)
 
-	sqlResults, err := repo.db.QueryContext(ctx, query, userID)
+	sqlResults, err := qe.QueryContext(ctx, query, userID)
 
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -101,4 +99,118 @@ func (repo PSQLOrderRepo) GetByUserID(ctx context.Context, userID model.UserID) 
 	}
 
 	return orders, nil
+}
+
+// func (repo PSQLOrderRepo) GetOrdersForProccessing(ctx context.Context) ([]model.OrderID, error) {
+// 	qe := repo.GetExecutor(ctx)
+// 	query := `WITH target_orders AS (SELECT id
+// 			    FROM orders
+// 			    WHERE status = 'NEW'
+// 			      OR (status = 'PROCESSING' AND (updated_at + INTERVAL '5 minutes' < NOW()) )
+// 			    ORDER BY added_at
+// 			    LIMIT 100 FOR UPDATE SKIP LOCKED)
+// 			  UPDATE orders
+// 			  SET status = 'PROCESSING'
+// 			  WHERE id IN (SELECT id FROM target_orders)
+// 			  RETURNING id;`
+
+// 	orders := make([]model.OrderID, 0)
+
+// 	sqlResults, err := qe.QueryContext(ctx, query)
+
+// 	if err != nil {
+// 		return nil, fmt.Errorf(
+// 			"ошибка выполнения SQL запроса: %w", err)
+// 	}
+// 	defer sqlResults.Close()
+
+// 	for sqlResults.Next() {
+// 		var o model.OrderID
+// 		err = sqlResults.Scan(&o)
+// 		if err != nil {
+// 			return nil, fmt.Errorf(
+// 				"ошибка парсинга результата SQL запроса: %w", err)
+// 		}
+// 		orders = append(orders, o)
+// 	}
+
+// 	if err = sqlResults.Err(); err != nil {
+// 		return nil, fmt.Errorf("ошибка парсинга результата SQL запроса: %w", err)
+// 	}
+
+// 	return orders, nil
+// }
+
+func (repo PSQLOrderRepo) ChangeOrderStatus(ctx context.Context, oID model.OrderID, oStatus model.OrderStatus) error {
+	query := `UPDATE orders
+			  SET status = $1, updated_at = Now()
+			  WHERE id = $2;`
+	qEx := repo.GetExecutor(ctx)
+
+	res, err := qEx.ExecContext(ctx, query, oStatus, oID)
+	if err != nil {
+		return fmt.Errorf("ошибка обновления статуса заказа: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка получения информации об обновленных заказах: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("заказ %v не найден", oID)
+	}
+
+	return nil
+}
+
+func (repo PSQLOrderRepo) GetByIDForUpdate(ctx context.Context, oID model.OrderID) (*model.Order, error) {
+	qe := repo.GetExecutor(ctx)
+	query := `
+			SELECT id, user_id, status, COALESCE(accrual, 0), added_at
+			FROM orders
+			WHERE id = $1 FOR UPDATE;`
+
+	res := qe.QueryRowContext(ctx, query, oID)
+	o := model.Order{}
+	err := res.Scan(&o.ID, &o.UserID, &o.Status, &o.Accrual, &o.AddedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, services.ErrNotFound
+		}
+		return nil, fmt.Errorf(
+			"ошибка информации об заказе из БД по ИД: %w", err)
+	}
+
+	return &o, nil
+}
+
+func (repo PSQLOrderRepo) GetNextOrderIDForProcessing(ctx context.Context) (*model.Order, error) {
+	qe := repo.GetExecutor(ctx)
+	query := `
+		UPDATE orders 
+		SET status = 'PROCESSING', updated_at = NOW()
+		WHERE id = (
+			SELECT id 
+			FROM orders 
+			WHERE (status = 'NEW') 
+			   OR (status = 'PROCESSING' AND updated_at < NOW() - INTERVAL '5 minutes')
+			ORDER BY added_at ASC
+			LIMIT 1
+			FOR UPDATE SKIP LOCKED 
+		)
+		RETURNING id, status, COALESCE(accrual, 0), added_at;`
+
+	res := qe.QueryRowContext(ctx, query)
+	o := model.Order{}
+	err := res.Scan(&o.ID, &o.Status, &o.Accrual, &o.AddedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, services.ErrNoOrdersForProcessing
+		}
+		return nil, fmt.Errorf(
+			"ошибка запроса заказа для обработки в БД: %w", err)
+	}
+
+	return &o, nil
 }
