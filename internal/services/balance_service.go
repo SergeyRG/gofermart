@@ -12,12 +12,14 @@ var ErrIncorrectOperSum = errors.New("некорректная сумма спи
 var ErrInsufficientBalance = errors.New("недостаточно средств на бонусном счете")
 
 type BalanceService interface {
+	AddUserBalance(context.Context, model.UserID) error
 	GetUserBalance(context.Context, model.UserID) (*model.Balance, error)
 	ExecOper(context.Context, model.Operation) (*model.Balance, error)
 	GetUserWithdrawals(ctx context.Context, userID model.UserID) ([]model.Operation, error)
 }
 
 type BalanceRepo interface {
+	AddUserBalance(context.Context, model.UserID) error
 	GetByUserID(context.Context, model.UserID) (*model.Balance, error)
 	ReduceBalance(context.Context, model.UserID, model.MoneyQty) (*model.Balance, error)
 	IncreaseBalance(context.Context, model.UserID, model.MoneyQty) (*model.Balance, error)
@@ -87,4 +89,8 @@ func (svc BalanceServiceImpl) ExecOper(ctx context.Context,
 
 func (svc BalanceServiceImpl) GetUserWithdrawals(ctx context.Context, userID model.UserID) ([]model.Operation, error) {
 	return svc.balanceRepo.GetWithdrawalsByUserID(ctx, userID)
+}
+
+func (svc BalanceServiceImpl) AddUserBalance(ctx context.Context, uID model.UserID) error {
+	return svc.balanceRepo.AddUserBalance(ctx, uID)
 }

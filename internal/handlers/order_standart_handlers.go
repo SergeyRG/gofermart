@@ -7,13 +7,17 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/SergeyRG/gofermart/internal/auth"
 	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/services"
 )
 
 func (h StandartHandlers) AddNewOrder() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
-		userID := model.UserID(1) // TODO
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			rw.WriteHeader(http.StatusUnauthorized)
+		}
 
 		reqHeader := r.Header.Get("Content-Type")
 
@@ -58,7 +62,10 @@ func (h StandartHandlers) AddNewOrder() http.HandlerFunc {
 
 func (h StandartHandlers) GetUserOrders() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
-		userID := model.UserID(1) // TODO
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			rw.WriteHeader(http.StatusUnauthorized)
+		}
 
 		defer r.Body.Close()
 

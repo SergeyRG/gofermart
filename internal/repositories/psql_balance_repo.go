@@ -147,3 +147,22 @@ func (repo PSQLBalanceRepo) GetWithdrawalsByUserID(ctx context.Context, userID m
 
 	return withdrawals, nil
 }
+
+func (repo PSQLBalanceRepo) AddUserBalance(
+	ctx context.Context,
+	uID model.UserID) error {
+
+	qe := repo.GetExecutor(ctx)
+	query := `
+			INSERT INTO balances (user_id, current, withdrawn) 
+			VALUES ($1, 0, 0)`
+
+	_, err := qe.ExecContext(ctx, query, uID)
+
+	if err != nil {
+		return fmt.Errorf(
+			"ошибка записи операции в БД: %w", err)
+	}
+
+	return nil
+}

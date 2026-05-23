@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SergeyRG/gofermart/internal/auth"
 	"github.com/SergeyRG/gofermart/internal/clients"
 	"github.com/SergeyRG/gofermart/internal/config"
 	"github.com/SergeyRG/gofermart/internal/handlers"
 	"github.com/SergeyRG/gofermart/internal/logging"
+	"github.com/SergeyRG/gofermart/internal/middleware"
 	"github.com/SergeyRG/gofermart/internal/migrations"
-	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/repositories"
 	"github.com/SergeyRG/gofermart/internal/services"
 	"github.com/go-chi/chi/v5"
@@ -19,10 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var USERID model.UserID
-
 func main() {
-	USERID = 1 //TODO
 
 	// Инициализация логгера
 	err := logging.Initialize("DEBUG")
@@ -56,13 +54,16 @@ func main() {
 	txManager := repositories.NewTXManager(db)
 
 	orderRepo := repositories.NewPSQLOrderRepo(db)
-	orderSvc := services.NewOrderService(orderRepo, txManager)
+	orderSvc := services.NewOrderService(orderRepo, txManager, 6)
 
 	balanceRepo := repositories.NewPSQLBalanceRepo(db)
 	balanceSvc := services.NewBalanceService(balanceRepo, txManager)
 
 	accrualHTTPClient := clients.NewRestyAccrualClient(cfg)
 	accrualSvc := services.NewAccrualService(txManager, orderSvc, balanceSvc, accrualHTTPClient)
+
+	userRepo := repositories.NewPSQLUserRepo(db)
+	userSvc := services.NewUserService(userRepo, txManager, balanceSvc)
 
 	g, gCtx := errgroup.WithContext(context.Background())
 
@@ -73,7 +74,7 @@ func main() {
 	}
 
 	g.Go(func() error {
-		if err := run(cfg, orderSvc, balanceSvc); err != nil {
+		if err := run(cfg, orderSvc, balanceSvc, userSvc); err != nil {
 			l.Error("ошибка запуска приложения", zap.Error(err))
 			return err
 		}
@@ -85,18 +86,25 @@ func main() {
 	}
 }
 
-func run(cfg config.Config, orderSvc services.OrderService, balanceSvc services.BalanceService) error {
+func run(cfg config.Config,
+	orderSvc services.OrderService,
+	balanceSvc services.BalanceService,
+	userSvc services.UserService) error {
+
 	l := logging.Logger
 	l.Info("Инициализация http сервера")
 
 	r := chi.NewRouter()
 
-	StandartHandlers := handlers.NewStandartHandlers(orderSvc, balanceSvc)
+	jwtm := auth.NewJWTManager([]byte(cfg.SecretKey))
+	UserHandlers := handlers.NewUserHandler(userSvc, *jwtm)
+	r.Post("/api/user/register", UserHandlers.Register())
+	r.Post("/api/user/login", UserHandlers.Login())
 
-	r.Route("/", func(r chi.Router) {
-		// 	r.Use(authMiddleware)
-		// 	r.Use(middleware.GzipMiddleware)
-		// 	r.Get("/{id}", redirectHandler)
+	StandartHandlers := handlers.NewStandartHandlers(orderSvc, balanceSvc)
+	authMiddleware := middleware.Auth(*jwtm)
+	r.Group(func(r chi.Router) {
+		r.Use(authMiddleware)
 		r.Get("/api/user/balance", StandartHandlers.GetUserBalance())
 		r.Post("/api/user/orders", StandartHandlers.AddNewOrder())
 		r.Get("/api/user/orders", StandartHandlers.GetUserOrders())

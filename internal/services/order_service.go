@@ -92,10 +92,10 @@ func (svc OrderServiceImpl) GetNextOrderIDForProcessing(ctx context.Context) (*m
 // 	}
 // }
 
-func NewOrderService(repo OrderRepo, txManager TransactionManager) OrderServiceImpl {
+func NewOrderService(repo OrderRepo, txManager TransactionManager, workersCnt int) OrderServiceImpl {
 	return OrderServiceImpl{
 		orderRepo:    repo,
 		TxManager:    txManager,
-		WorkersCount: 1,
+		WorkersCount: workersCnt,
 	}
 }

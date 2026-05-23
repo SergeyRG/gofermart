@@ -8,13 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SergeyRG/gofermart/internal/auth"
 	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/services"
 )
 
 func (h StandartHandlers) GetUserBalance() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
-		userID := model.UserID(1) // TODO
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			rw.WriteHeader(http.StatusUnauthorized)
+		}
 
 		balance, err := h.balanceSvc.GetUserBalance(r.Context(), userID)
 		if err != nil {
@@ -38,7 +42,10 @@ func (h StandartHandlers) GetUserBalance() http.HandlerFunc {
 
 func (h StandartHandlers) Withdraw() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
-		userID := model.UserID(1) // TODO
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			rw.WriteHeader(http.StatusUnauthorized)
+		}
 
 		reqHeader := r.Header.Get("Content-Type")
 		if !strings.Contains(reqHeader, "application/json") {
@@ -79,7 +86,10 @@ func (h StandartHandlers) Withdraw() http.HandlerFunc {
 
 func (h StandartHandlers) GetWithdrawals() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
-		userID := model.UserID(1) // TODO
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			rw.WriteHeader(http.StatusUnauthorized)
+		}
 
 		withdrawals, err := h.balanceSvc.GetUserWithdrawals(r.Context(), userID)
 		if err != nil {

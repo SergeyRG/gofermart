@@ -31,6 +31,12 @@ const (
 
 type UserID int64
 
+type User struct {
+	UserID  UserID `json:"-"`
+	Login   string `json:"login"`
+	PwdHash string `json:"password"`
+}
+
 type MoneyQty int64
 
 func (m MoneyQty) MarshalJSON() ([]byte, error) {
@@ -94,13 +100,6 @@ func NewOrderID(value string) (OrderID, error) {
 		return "", ErrInvalidOrderID
 	}
 	return newID, nil
-}
-
-type User struct {
-	ID        UserID
-	Login     string
-	Current   MoneyQty
-	Withdrawn MoneyQty
 }
 
 type Order struct {
