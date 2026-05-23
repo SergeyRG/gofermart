@@ -9,10 +9,8 @@ import (
 	"time"
 
 	"github.com/SergeyRG/gofermart/internal/auth"
-	"github.com/SergeyRG/gofermart/internal/logging"
 	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/services"
-	"go.uber.org/zap"
 )
 
 func (h StandartHandlers) GetUserBalance() http.HandlerFunc {
@@ -91,14 +89,12 @@ func (h StandartHandlers) Withdraw() http.HandlerFunc {
 func (h StandartHandlers) GetWithdrawals() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
-		logging.Logger.Debug("запрос списаний от пользователя", zap.Int("ID", int(userID)))
 		if !ok {
 			rw.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		withdrawals, err := h.balanceSvc.GetUserWithdrawals(r.Context(), userID)
-		logging.Logger.Debug("списания пользователя получены", zap.Int("qty", len(withdrawals)))
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
@@ -108,9 +104,6 @@ func (h StandartHandlers) GetWithdrawals() http.HandlerFunc {
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
-
-		str, _ := json.Marshal(withdrawals)
-		logging.Logger.Debug("списания пользователя получены", zap.String("ответ", string(str)))
 
 		rw.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(rw).Encode(withdrawals)
