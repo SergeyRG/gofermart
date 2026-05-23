@@ -84,6 +84,9 @@ func (as *AccrualServiceImpl) ProcessOrder(
 ) {
 	answer, err := as.AccrualClient.RequestAccrualSystemOrderStatus(ctx, oID)
 	if err != nil {
+		logging.Logger.Debug("ошибка получения информации от системы начисления",
+			zap.Error(err))
+
 		if errors.Is(err, ErrTooManyRequests) {
 			as.FreezeManager.Freeze(answer.FreezeSeconds)
 			as.Txm.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -116,6 +119,9 @@ func (as *AccrualServiceImpl) ProcessOrder(
 		logging.Logger.Error("непредвиденная ошибка при запросе к системе начислений", zap.Error(err))
 		return
 	}
+	logging.Logger.Debug("получен ответ системы начисления",
+		zap.String("order ID", string(answer.OrderInfo.Order)),
+		zap.String("status", string(answer.OrderInfo.Status)))
 
 	if answer.OrderInfo.Status == AccrualSystemStatusRegistered ||
 		answer.OrderInfo.Status == AccrualSystemStatusProcessing {
