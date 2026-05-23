@@ -78,6 +78,31 @@ func (as *AccrualServiceImpl) ChangeProcessingOrderStatus(
 	return order, nil
 }
 
+func (as *AccrualServiceImpl) ChangeProcessingOrder(
+	ctx context.Context,
+	oInfo AccrualSystemOrderInfo,
+	status model.OrderStatus) (*model.Order, error) {
+
+	order, err := as.OrderService.GetByIDForUpdate(ctx, oInfo.Order)
+	if err != nil {
+		return nil, err
+	}
+
+	if order.Status != model.StatusProcessing {
+		return nil, fmt.Errorf("у заказа статус отличный от PROCESSING: %v", order.Status)
+	}
+
+	order.Status = status
+	order.Accrual = oInfo.Accrual
+
+	err = as.OrderService.UpdateOrder(ctx, *order)
+	if err != nil {
+		return nil, err
+	}
+
+	return order, nil
+}
+
 func (as *AccrualServiceImpl) ProcessOrder(
 	ctx context.Context,
 	oID model.OrderID,
@@ -152,7 +177,7 @@ func (as *AccrualServiceImpl) ProcessOrder(
 }
 
 func (as *AccrualServiceImpl) succeedOrder(ctx context.Context, oInfo AccrualSystemOrderInfo) error {
-	order, err := as.ChangeProcessingOrderStatus(ctx, oInfo.Order, model.StatusProcessed)
+	order, err := as.ChangeProcessingOrder(ctx, oInfo, model.StatusProcessed)
 	if err != nil {
 		return err
 	}

@@ -101,46 +101,6 @@ func (repo PSQLOrderRepo) GetByUserID(ctx context.Context, userID model.UserID) 
 	return orders, nil
 }
 
-// func (repo PSQLOrderRepo) GetOrdersForProccessing(ctx context.Context) ([]model.OrderID, error) {
-// 	qe := repo.GetExecutor(ctx)
-// 	query := `WITH target_orders AS (SELECT id
-// 			    FROM orders
-// 			    WHERE status = 'NEW'
-// 			      OR (status = 'PROCESSING' AND (updated_at + INTERVAL '5 minutes' < NOW()) )
-// 			    ORDER BY added_at
-// 			    LIMIT 100 FOR UPDATE SKIP LOCKED)
-// 			  UPDATE orders
-// 			  SET status = 'PROCESSING'
-// 			  WHERE id IN (SELECT id FROM target_orders)
-// 			  RETURNING id;`
-
-// 	orders := make([]model.OrderID, 0)
-
-// 	sqlResults, err := qe.QueryContext(ctx, query)
-
-// 	if err != nil {
-// 		return nil, fmt.Errorf(
-// 			"ошибка выполнения SQL запроса: %w", err)
-// 	}
-// 	defer sqlResults.Close()
-
-// 	for sqlResults.Next() {
-// 		var o model.OrderID
-// 		err = sqlResults.Scan(&o)
-// 		if err != nil {
-// 			return nil, fmt.Errorf(
-// 				"ошибка парсинга результата SQL запроса: %w", err)
-// 		}
-// 		orders = append(orders, o)
-// 	}
-
-// 	if err = sqlResults.Err(); err != nil {
-// 		return nil, fmt.Errorf("ошибка парсинга результата SQL запроса: %w", err)
-// 	}
-
-// 	return orders, nil
-// }
-
 func (repo PSQLOrderRepo) ChangeOrderStatus(ctx context.Context, oID model.OrderID, oStatus model.OrderStatus) error {
 	query := `UPDATE orders
 			  SET status = $1, updated_at = Now()
@@ -159,6 +119,29 @@ func (repo PSQLOrderRepo) ChangeOrderStatus(ctx context.Context, oID model.Order
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("заказ %v не найден", oID)
+	}
+
+	return nil
+}
+
+func (repo PSQLOrderRepo) UpdateOrder(ctx context.Context, o model.Order) error {
+	query := `UPDATE orders
+			  SET status = $1, updated_at = Now(), accrual = $2
+			  WHERE id = $3;`
+	qEx := repo.GetExecutor(ctx)
+
+	res, err := qEx.ExecContext(ctx, query, o.Status, o.Accrual, o.ID)
+	if err != nil {
+		return fmt.Errorf("ошибка обновления статуса заказа: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка получения информации об обновленных заказах: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("заказ %v не найден", o.ID)
 	}
 
 	return nil

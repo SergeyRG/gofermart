@@ -23,6 +23,7 @@ type OrderService interface {
 	ChangeOrderStatus(context.Context, model.OrderID, model.OrderStatus) error
 	GetByIDForUpdate(ctx context.Context, oID model.OrderID) (*model.Order, error)
 	GetNextOrderIDForProcessing(ctx context.Context) (*model.Order, error)
+	UpdateOrder(ctx context.Context, o model.Order) error
 }
 
 type OrderRepo interface {
@@ -32,6 +33,7 @@ type OrderRepo interface {
 	//	GetOrdersForProccessing(context.Context) ([]model.OrderID, error)
 	ChangeOrderStatus(context.Context, model.OrderID, model.OrderStatus) error
 	GetNextOrderIDForProcessing(ctx context.Context) (*model.Order, error)
+	UpdateOrder(ctx context.Context, o model.Order) error
 }
 
 type OrderServiceImpl struct {
@@ -60,6 +62,9 @@ func (svc OrderServiceImpl) GetByIDForUpdate(ctx context.Context, oID model.Orde
 
 func (svc OrderServiceImpl) GetNextOrderIDForProcessing(ctx context.Context) (*model.Order, error) {
 	return svc.orderRepo.GetNextOrderIDForProcessing(ctx)
+}
+func (svc OrderServiceImpl) UpdateOrder(ctx context.Context, o model.Order) error {
+	return svc.orderRepo.UpdateOrder(ctx, o)
 }
 
 // func (svc OrderServiceImpl) RunOrderExtractor(ctx context.Context, ordersChan chan<- model.OrderID) error {

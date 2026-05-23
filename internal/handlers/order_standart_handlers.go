@@ -17,6 +17,7 @@ func (h StandartHandlers) AddNewOrder() http.HandlerFunc {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
 			rw.WriteHeader(http.StatusUnauthorized)
+			return
 		}
 
 		reqHeader := r.Header.Get("Content-Type")
@@ -36,7 +37,7 @@ func (h StandartHandlers) AddNewOrder() http.HandlerFunc {
 
 		orderID, err := model.NewOrderID(string(orderIDStr))
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
+			rw.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		}
 
@@ -65,6 +66,7 @@ func (h StandartHandlers) GetUserOrders() http.HandlerFunc {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
 			rw.WriteHeader(http.StatusUnauthorized)
+			return
 		}
 
 		defer r.Body.Close()
