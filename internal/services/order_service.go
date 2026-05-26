@@ -17,6 +17,7 @@ var ErrUndefinedRepositoryError = errors.New(
 var ErrNotFound = errors.New("заказ не найден в БД")
 var ErrNoOrdersForProcessing = errors.New("нет заказов для обработки")
 
+//go:generate mockgen -destination=../mocks/mock_order_service.go -package=mocks . OrderService
 type OrderService interface {
 	AddOrder(context.Context, model.UserID, model.OrderID) error
 	GetUserOrders(context.Context, model.UserID) ([]model.Order, error)
@@ -26,6 +27,7 @@ type OrderService interface {
 	UpdateOrder(ctx context.Context, o model.Order) error
 }
 
+//go:generate mockgen -destination=../mocks/mock_order_repo.go -package=mocks . OrderRepo
 type OrderRepo interface {
 	GetByUserID(context.Context, model.UserID) ([]model.Order, error)
 	GetByIDForUpdate(context.Context, model.OrderID) (*model.Order, error)
@@ -37,9 +39,8 @@ type OrderRepo interface {
 }
 
 type OrderServiceImpl struct {
-	orderRepo    OrderRepo
-	TxManager    TransactionManager
-	WorkersCount int
+	orderRepo OrderRepo
+	TxManager TransactionManager
 }
 
 func (svc OrderServiceImpl) AddOrder(ctx context.Context, userID model.UserID, orderID model.OrderID) error {
@@ -67,40 +68,9 @@ func (svc OrderServiceImpl) UpdateOrder(ctx context.Context, o model.Order) erro
 	return svc.orderRepo.UpdateOrder(ctx, o)
 }
 
-// func (svc OrderServiceImpl) RunOrderExtractor(ctx context.Context, ordersChan chan<- model.OrderID) error {
-// 	tk := time.NewTicker(time.Minute)
-// 	defer tk.Stop()
-// 	logging.Logger.Info("запуск выгрузки заказов")
-// 	for {
-// 		select {
-// 		case <-ctx.Done():
-// 			return nil
-// 		case <-tk.C:
-// 			logging.Logger.Info("выгрузка заказов по таймеру")
-// 			orders, err := svc.orderRepo.GetOrdersForProccessing(ctx)
-// 			if err != nil {
-// 				logging.Logger.Error("Ошибка выгрузки заказов для обработки", zap.Error(err))
-// 				return err
-// 			}
-
-// 			for _, o := range orders {
-// 				select {
-// 				case ordersChan <- o:
-// 					logging.Logger.Debug(
-// 						"постановка в очередь заказа", zap.String("номер", string(o)))
-// 				case <-ctx.Done():
-// 					close(ordersChan)
-// 					return nil
-// 				}
-// 			}
-// 		}
-// 	}
-// }
-
-func NewOrderService(repo OrderRepo, txManager TransactionManager, workersCnt int) OrderServiceImpl {
+func NewOrderService(repo OrderRepo, txManager TransactionManager) OrderServiceImpl {
 	return OrderServiceImpl{
-		orderRepo:    repo,
-		TxManager:    txManager,
-		WorkersCount: workersCnt,
+		orderRepo: repo,
+		TxManager: txManager,
 	}
 }

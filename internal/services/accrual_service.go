@@ -34,12 +34,14 @@ const (
 	AccrualSystemStatusProcessed  = "PROCESSED"
 )
 
+//go:generate mockgen -destination=../mocks/mock_accrual_service.go -package=mocks . AccrualService
 type AccrualService interface {
 	SucceedOrder(context.Context, model.OrderID) error
 	ProcessOrder(context.Context, model.OrderID) error
 	ChangeProcessingOrderStatus(context.Context, model.OrderID, model.OrderStatus) error
 }
 
+//go:generate mockgen -destination=../mocks/mock_accrual_client.go -package=mocks . AccrualClient
 type AccrualClient interface {
 	RequestAccrualSystemOrderStatus(ctx context.Context, orderID model.OrderID) (*AccrualSystemAnswer, error)
 }
@@ -50,10 +52,11 @@ type AccrualServiceImpl struct {
 	BalanceService BalanceService
 	AccrualClient  AccrualClient
 	FreezeManager  FreezeManager
+	WorkersCount   int
 }
 
-func NewAccrualService(txm TransactionManager, os OrderService, bs BalanceService, ac AccrualClient) *AccrualServiceImpl {
-	return &AccrualServiceImpl{Txm: txm, OrderService: os, BalanceService: bs, AccrualClient: ac}
+func NewAccrualService(txm TransactionManager, os OrderService, bs BalanceService, ac AccrualClient, wc int) *AccrualServiceImpl {
+	return &AccrualServiceImpl{Txm: txm, OrderService: os, BalanceService: bs, AccrualClient: ac, WorkersCount: wc}
 }
 
 func (as *AccrualServiceImpl) ChangeProcessingOrderStatus(
@@ -107,17 +110,23 @@ func (as *AccrualServiceImpl) ProcessOrder(
 	ctx context.Context,
 	oID model.OrderID,
 ) {
+
 	answer, err := as.AccrualClient.RequestAccrualSystemOrderStatus(ctx, oID)
 	if err != nil {
-		logging.Logger.Debug("ошибка получения информации от системы начисления",
+		logging.Logger.Debug("ошибка получения информации от системы начислений",
 			zap.Error(err))
 
 		if errors.Is(err, ErrTooManyRequests) {
 			as.FreezeManager.Freeze(answer.FreezeSeconds)
-			as.Txm.WithinTransaction(ctx, func(txCtx context.Context) error {
+			txErr := as.Txm.WithinTransaction(ctx, func(txCtx context.Context) error {
 				_, err := as.ChangeProcessingOrderStatus(txCtx, oID, model.StatusNew)
 				return err
 			})
+			if txErr != nil {
+				logging.Logger.Error("ошибка изменения статуса заказа",
+					zap.Error(txErr))
+
+			}
 			return
 		}
 		if errors.Is(err, ErrOrderNotRegistered) {
@@ -144,6 +153,7 @@ func (as *AccrualServiceImpl) ProcessOrder(
 		logging.Logger.Error("непредвиденная ошибка при запросе к системе начислений", zap.Error(err))
 		return
 	}
+
 	logging.Logger.Debug("получен ответ системы начисления",
 		zap.String("order ID", string(answer.OrderInfo.Order)),
 		zap.String("status", string(answer.OrderInfo.Status)))

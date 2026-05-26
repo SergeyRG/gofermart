@@ -11,6 +11,7 @@ import (
 var ErrIncorrectOperSum = errors.New("некорректная сумма списания")
 var ErrInsufficientBalance = errors.New("недостаточно средств на бонусном счете")
 
+//go:generate mockgen -destination=../mocks/mock_balance_service.go -package=mocks . BalanceService
 type BalanceService interface {
 	AddUserBalance(context.Context, model.UserID) error
 	GetUserBalance(context.Context, model.UserID) (*model.Balance, error)
@@ -18,6 +19,7 @@ type BalanceService interface {
 	GetUserWithdrawals(ctx context.Context, userID model.UserID) ([]model.Operation, error)
 }
 
+//go:generate mockgen -destination=../mocks/mock_balance_repo.go -package=mocks . BalanceRepo
 type BalanceRepo interface {
 	AddUserBalance(context.Context, model.UserID) error
 	GetByUserID(context.Context, model.UserID) (*model.Balance, error)

@@ -41,7 +41,7 @@ func main() {
 	err = migrations.RunMigrations(cfg.DBDSN)
 	if err != nil {
 		l.Fatal(
-			"Сбой запуска приложения, не удалось миграцию схемы БД", zap.Error(err))
+			"Сбой запуска приложения, не удалось выполнить миграцию схемы БД", zap.Error(err))
 	}
 	l.Info("Обновление БД завершено")
 
@@ -54,20 +54,20 @@ func main() {
 	txManager := repositories.NewTXManager(db)
 
 	orderRepo := repositories.NewPSQLOrderRepo(db)
-	orderSvc := services.NewOrderService(orderRepo, txManager, 6)
+	orderSvc := services.NewOrderService(orderRepo, txManager)
 
 	balanceRepo := repositories.NewPSQLBalanceRepo(db)
 	balanceSvc := services.NewBalanceService(balanceRepo, txManager)
 
 	accrualHTTPClient := clients.NewRestyAccrualClient(cfg)
-	accrualSvc := services.NewAccrualService(txManager, orderSvc, balanceSvc, accrualHTTPClient)
+	accrualSvc := services.NewAccrualService(txManager, orderSvc, balanceSvc, accrualHTTPClient, 6)
 
 	userRepo := repositories.NewPSQLUserRepo(db)
 	userSvc := services.NewUserService(userRepo, txManager, balanceSvc)
 
 	g, gCtx := errgroup.WithContext(context.Background())
 
-	for workerID := range orderSvc.WorkersCount {
+	for workerID := range accrualSvc.WorkersCount {
 		g.Go(func() error {
 			return accrualSvc.RunWorker(gCtx, workerID)
 		})
