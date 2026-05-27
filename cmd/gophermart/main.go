@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	_ "github.com/SergeyRG/gofermart/docs"
 	"github.com/SergeyRG/gofermart/internal/auth"
 	"github.com/SergeyRG/gofermart/internal/clients"
 	"github.com/SergeyRG/gofermart/internal/config"
@@ -16,10 +17,20 @@ import (
 	"github.com/SergeyRG/gofermart/internal/repositories"
 	"github.com/SergeyRG/gofermart/internal/services"
 	"github.com/go-chi/chi/v5"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
+// @title           API для управления бонусным балансом Гофермарта
+// @version         1.0
+// @description     Сервис для управления балансом пользователей и просмотра заказов.
+// @host            localhost:8080
+// @BasePath        /api
+
+// @securityDefinitions.apikey CookieAuth
+// @in                         cookie
+// @name                       auth_token
 func main() {
 
 	// Инициализация логгера
@@ -111,6 +122,8 @@ func run(cfg config.Config,
 		r.Post("/api/user/balance/withdraw", StandardHandlers.Withdraw())
 		r.Get("/api/user/withdrawals", StandardHandlers.GetWithdrawals())
 	})
+
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	server := &http.Server{
 		Addr:              cfg.ServerAddress,
