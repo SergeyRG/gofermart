@@ -155,25 +155,5 @@ type Operation struct {
 	OrderID     OrderID       `json:"order"`
 	Sum         MoneyQty      `json:"sum"`
 	OpType      OperationType `json:"-"`
-	ProcessedAt time.Time     `json:"processed_at"`
+	ProcessedAt time.Time     `json:"processed_at" swaggerignore:"true"`
 }
-
-// func NewOperation(userID UserID,
-// 	orderID string,
-// 	sum string,
-// 	opType string,
-// 	processedAt *time.Time) (*Operation, error) {
-
-// 	orderIDVerified, err := NewOrderID(orderID)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("ошибка проверки данных: %w", err)
-// 	}
-
-// 	return &Operation{
-// 		UserID:      userID,
-// 		OrderID:     orderIDVerified,
-// 		Sum:         sum,
-// 		OpType:      opType,
-// 		ProcessedAt: *processedAt,
-// 	}, nil
-// }

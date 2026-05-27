@@ -14,6 +14,16 @@ import (
 	"github.com/SergeyRG/gofermart/internal/services"
 )
 
+// GetUserBalance godoc
+// @Summary       Получить текущий баланс пользователя
+// @Description   Возвращает в виде JSON текущий баланс для текущего пользователя
+// @Tags          balance
+// @Produce       json
+// @Security      CookieAuth
+// @Success       200  {object}   model.Balance   "Успешное получение списка заказов"
+// @Failure       401  {string}   string          "Пользователь не авторизован"
+// @Failure       500  {string}   string          "Внутренняя ошибка сервера"
+// @Router        /user/balance   [get]
 func (h StandardHandlers) GetUserBalance() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
@@ -42,6 +52,18 @@ func (h StandardHandlers) GetUserBalance() http.HandlerFunc {
 	return http.HandlerFunc(hf)
 }
 
+// Withdraw godoc
+// @Summary      Списать бонусные баллы
+// @Description  Вызов эндпойнта приводит к списанию баллов с бонусного баланса, если их достаточно
+// @Param        request   body      model.Operation  true  "Данные для списания (номер заказа и сумма)"
+// @Tags         balance
+// @Security     CookieAuth
+// @Success      200  {string}  string 		    "Успешное списание"
+// @Failure      400  {string}  string          "Некорректный запрос"
+// @Failure      401  {string}  string          "Пользователь не авторизован"
+// @Failure      402  {string}  string          "Недостаточно бонусов нв балансе"
+// @Failure      500  {string}  string          "Внутренняя ошибка сервера"
+// @Router       /user/balance/withdraw [post]
 func (h StandardHandlers) Withdraw() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
@@ -60,6 +82,7 @@ func (h StandardHandlers) Withdraw() http.HandlerFunc {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		defer r.Body.Close()
 
 		oper := model.Operation{}
 		err = json.Unmarshal(body, &oper)
@@ -87,6 +110,16 @@ func (h StandardHandlers) Withdraw() http.HandlerFunc {
 	return http.HandlerFunc(hf)
 }
 
+// GetWithdrawals godoc
+// @Summary      Получить список всех списаний
+// @Description  Возвращает JSON-массив всех списания текущего пользователя
+// @Tags         balance
+// @Security     CookieAuth
+// @Success      200  {array}   model.Operation "Успешное списание"
+// @Success      204  {string}  string          "Отсутствуют операции"
+// @Failure      401  {string}  string          "Пользователь не авторизован"
+// @Failure      500  {string}  string          "Внутренняя ошибка сервера"
+// @Router       /api/user/withdrawals [get]
 func (h StandardHandlers) GetWithdrawals() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())

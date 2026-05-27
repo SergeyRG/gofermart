@@ -1,0 +1,116 @@
+basePath: /api
+definitions:
+  model.Balance:
+    properties:
+      current:
+        type: integer
+      withdrawn:
+        type: integer
+    type: object
+  model.Operation:
+    properties:
+      order:
+        type: string
+      sum:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Сервис для управления балансом пользователей и просмотра заказов.
+  title: API для управления бонусным балансом Гофермарта
+  version: "1.0"
+paths:
+  /api/user/withdrawals:
+    get:
+      description: Возвращает JSON-массив всех списания текущего пользователя
+      responses:
+        "200":
+          description: Успешное списание
+          schema:
+            items:
+              $ref: '#/definitions/model.Operation'
+            type: array
+        "204":
+          description: Отсутствуют операции
+          schema:
+            type: string
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Получить список всех списаний
+      tags:
+      - balance
+  /user/balance:
+    get:
+      description: Возвращает в виде JSON текущий баланс для текущего пользователя
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка заказов
+          schema:
+            $ref: '#/definitions/model.Balance'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Получить текущий баланс пользователя
+      tags:
+      - balance
+  /user/balance/withdraw:
+    post:
+      description: Вызов эндпойнта приводит к списанию баллов с бонусного баланса,
+        если их достаточно
+      parameters:
+      - description: Данные для списания (номер заказа и сумма)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Operation'
+      responses:
+        "200":
+          description: Успешное списание
+          schema:
+            type: string
+        "400":
+          description: Некорректный запрос
+          schema:
+            type: string
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
+        "402":
+          description: Недостаточно бонусов нв балансе
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Списать бонусные баллы
+      tags:
+      - balance
+securityDefinitions:
+  CookieAuth:
+    in: cookie
+    name: auth_token
+    type: apiKey
+swagger: "2.0"
