@@ -13,7 +13,7 @@ import (
 	"github.com/SergeyRG/gofermart/internal/services"
 )
 
-func (h StandartHandlers) GetUserBalance() http.HandlerFunc {
+func (h StandardHandlers) GetUserBalance() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
@@ -41,7 +41,7 @@ func (h StandartHandlers) GetUserBalance() http.HandlerFunc {
 	return http.HandlerFunc(hf)
 }
 
-func (h StandartHandlers) Withdraw() http.HandlerFunc {
+func (h StandardHandlers) Withdraw() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
@@ -86,7 +86,7 @@ func (h StandartHandlers) Withdraw() http.HandlerFunc {
 	return http.HandlerFunc(hf)
 }
 
-func (h StandartHandlers) GetWithdrawals() http.HandlerFunc {
+func (h StandardHandlers) GetWithdrawals() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {

@@ -15,7 +15,6 @@ var (
 
 //go:generate mockgen -destination=../mocks/mock_user_service.go -package=mocks . UserService
 type UserService interface {
-	GetUserByLogin(ctx context.Context, login string) (*model.User, error)
 	AddUser(ctx context.Context, login string, password string) (model.UserID, error)
 	AuthUser(ctx context.Context, login string, pwdHash string) (model.UserID, error)
 }
@@ -36,12 +35,12 @@ func NewUserService(repo UserRepo, txm TransactionManager, bSvc BalanceService) 
 	return &UserServiceImpl{repo: repo, txm: txm, balanceService: bSvc}
 }
 
-func (svc UserServiceImpl) GetUserByLogin(ctx context.Context, login string) (*model.User, error) {
+func (svc UserServiceImpl) getUserByLogin(ctx context.Context, login string) (*model.User, error) {
 	return svc.repo.GetUserByLogin(ctx, login)
 }
 
 func (svc UserServiceImpl) AuthUser(ctx context.Context, login string, pwd string) (model.UserID, error) {
-	user, err := svc.GetUserByLogin(ctx, login)
+	user, err := svc.getUserByLogin(ctx, login)
 	if err != nil {
 		return 0, err
 	}

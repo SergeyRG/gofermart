@@ -18,7 +18,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestStandartHandlers_AddNewOrder(t *testing.T) {
+func TestStandardHandlers_AddNewOrder(t *testing.T) {
 	endpoint := "/api/user/orders"
 	tests := []struct {
 		name                string
@@ -128,7 +128,7 @@ func TestStandartHandlers_AddNewOrder(t *testing.T) {
 			tt.setupOrderSvcMock(orderSvcMock)
 			balanceSvcMock := mocks.NewMockBalanceService(ctrl)
 			tt.setupBalanceSvcMock(balanceSvcMock)
-			h := handlers.NewStandartHandlers(orderSvcMock, balanceSvcMock)
+			h := handlers.NewStandardHandlers(orderSvcMock, balanceSvcMock)
 
 			req := httptest.NewRequest(http.MethodPost, endpoint, nil)
 			if tt.ctx != nil {

@@ -101,15 +101,15 @@ func run(cfg config.Config,
 	r.Post("/api/user/register", UserHandlers.Register())
 	r.Post("/api/user/login", UserHandlers.Login())
 
-	StandartHandlers := handlers.NewStandartHandlers(orderSvc, balanceSvc)
+	StandardHandlers := handlers.NewStandardHandlers(orderSvc, balanceSvc)
 	authMiddleware := middleware.Auth(*jwtm)
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware)
-		r.Get("/api/user/balance", StandartHandlers.GetUserBalance())
-		r.Post("/api/user/orders", StandartHandlers.AddNewOrder())
-		r.Get("/api/user/orders", StandartHandlers.GetUserOrders())
-		r.Post("/api/user/balance/withdraw", StandartHandlers.Withdraw())
-		r.Get("/api/user/withdrawals", StandartHandlers.GetWithdrawals())
+		r.Get("/api/user/balance", StandardHandlers.GetUserBalance())
+		r.Post("/api/user/orders", StandardHandlers.AddNewOrder())
+		r.Get("/api/user/orders", StandardHandlers.GetUserOrders())
+		r.Post("/api/user/balance/withdraw", StandardHandlers.Withdraw())
+		r.Get("/api/user/withdrawals", StandardHandlers.GetWithdrawals())
 	})
 
 	server := &http.Server{

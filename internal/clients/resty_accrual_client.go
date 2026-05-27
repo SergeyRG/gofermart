@@ -27,7 +27,7 @@ func NewRestyAccrualClient(cfg config.Config) *RestyAccrualClient {
 func (rc RestyAccrualClient) RequestAccrualSystemOrderStatus(
 	ctx context.Context,
 	orderID model.OrderID,
-) (*services.AccrualSystemAnswer, error) {
+) (*services.AccrualSystemOrderInfo, error) {
 
 	resp, err := rc.client.R().SetContext(ctx).SetPathParam("orderID", string(orderID)).
 		Get("/api/orders/{orderID}")
@@ -49,10 +49,7 @@ func (rc RestyAccrualClient) RequestAccrualSystemOrderStatus(
 		if err != nil {
 			retryAfter = 60
 		}
-		return &services.AccrualSystemAnswer{
-			OrderInfo:     nil,
-			FreezeSeconds: retryAfter,
-		}, services.ErrTooManyRequests
+		return nil, services.ErrTooManyRequests{FreezeDuration: retryAfter}
 
 	case 200:
 		orderInfo := services.AccrualSystemOrderInfo{}
@@ -61,10 +58,7 @@ func (rc RestyAccrualClient) RequestAccrualSystemOrderStatus(
 			return nil, errors.New("неккоректный ответ от сервиса расчета начислений")
 		}
 
-		return &services.AccrualSystemAnswer{
-			OrderInfo:     &orderInfo,
-			FreezeSeconds: 0,
-		}, nil
+		return &orderInfo, nil
 	}
 
 	return nil, errors.New("некорректный ответ от сервиса расчета начислений")

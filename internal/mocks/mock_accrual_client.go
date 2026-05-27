@@ -43,10 +43,10 @@ func (m *MockAccrualClient) EXPECT() *MockAccrualClientMockRecorder {
 }
 
 // RequestAccrualSystemOrderStatus mocks base method.
-func (m *MockAccrualClient) RequestAccrualSystemOrderStatus(ctx context.Context, orderID model.OrderID) (*services.AccrualSystemAnswer, error) {
+func (m *MockAccrualClient) RequestAccrualSystemOrderStatus(ctx context.Context, orderID model.OrderID) (*services.AccrualSystemOrderInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RequestAccrualSystemOrderStatus", ctx, orderID)
-	ret0, _ := ret[0].(*services.AccrualSystemAnswer)
+	ret0, _ := ret[0].(*services.AccrualSystemOrderInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

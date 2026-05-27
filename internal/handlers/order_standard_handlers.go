@@ -12,7 +12,7 @@ import (
 	"github.com/SergeyRG/gofermart/internal/services"
 )
 
-func (h StandartHandlers) AddNewOrder() http.HandlerFunc {
+func (h StandardHandlers) AddNewOrder() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {
@@ -61,7 +61,7 @@ func (h StandartHandlers) AddNewOrder() http.HandlerFunc {
 	return http.HandlerFunc(hf)
 }
 
-func (h StandartHandlers) GetUserOrders() http.HandlerFunc {
+func (h StandardHandlers) GetUserOrders() http.HandlerFunc {
 	hf := func(rw http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.UserIDFromContext(r.Context())
 		if !ok {

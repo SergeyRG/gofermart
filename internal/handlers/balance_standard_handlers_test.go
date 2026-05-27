@@ -25,7 +25,7 @@ type headerWant struct {
 	contains string
 }
 
-func TestStandartHandlers_GetUserBalance(t *testing.T) {
+func TestStandardHandlers_GetUserBalance(t *testing.T) {
 	endpoint := "/api/user/balance"
 	positiveCaseBalance := &model.Balance{
 		UserID:    1,
@@ -88,7 +88,7 @@ func TestStandartHandlers_GetUserBalance(t *testing.T) {
 			tt.setupOrderSvcMock(orderSvcMock)
 			balanceSvcMock := mocks.NewMockBalanceService(ctrl)
 			tt.setupBalanceSvcMock(balanceSvcMock)
-			h := handlers.NewStandartHandlers(orderSvcMock, balanceSvcMock)
+			h := handlers.NewStandardHandlers(orderSvcMock, balanceSvcMock)
 
 			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
 			if tt.ctx != nil {
@@ -124,7 +124,7 @@ func TestStandartHandlers_GetUserBalance(t *testing.T) {
 	}
 }
 
-func TestStandartHandlers_Withdraw(t *testing.T) {
+func TestStandardHandlers_Withdraw(t *testing.T) {
 	endpoint := "/api/user/balance/withdraw"
 	tests := []struct {
 		name                string
@@ -230,7 +230,7 @@ func TestStandartHandlers_Withdraw(t *testing.T) {
 			tt.setupOrderSvcMock(orderSvcMock)
 			balanceSvcMock := mocks.NewMockBalanceService(ctrl)
 			tt.setupBalanceSvcMock(balanceSvcMock)
-			h := handlers.NewStandartHandlers(orderSvcMock, balanceSvcMock)
+			h := handlers.NewStandardHandlers(orderSvcMock, balanceSvcMock)
 
 			req := httptest.NewRequest(http.MethodPost, endpoint, nil)
 			if tt.ctx != nil {
@@ -267,7 +267,7 @@ func TestStandartHandlers_Withdraw(t *testing.T) {
 	}
 }
 
-func TestStandartHandlers_GetWithdrawals(t *testing.T) {
+func TestStandardHandlers_GetWithdrawals(t *testing.T) {
 	endpoint := "/api/user/withdrawals"
 	tests := []struct {
 		name                string
@@ -347,7 +347,7 @@ func TestStandartHandlers_GetWithdrawals(t *testing.T) {
 			tt.setupOrderSvcMock(orderSvcMock)
 			balanceSvcMock := mocks.NewMockBalanceService(ctrl)
 			tt.setupBalanceSvcMock(balanceSvcMock)
-			h := handlers.NewStandartHandlers(orderSvcMock, balanceSvcMock)
+			h := handlers.NewStandardHandlers(orderSvcMock, balanceSvcMock)
 
 			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
 			if tt.ctx != nil {
