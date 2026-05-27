@@ -1,23 +1,37 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
 
+	_ "github.com/SergeyRG/gofermart/docs"
+	"github.com/SergeyRG/gofermart/internal/auth"
+	"github.com/SergeyRG/gofermart/internal/clients"
 	"github.com/SergeyRG/gofermart/internal/config"
 	"github.com/SergeyRG/gofermart/internal/handlers"
 	"github.com/SergeyRG/gofermart/internal/logging"
-	"github.com/SergeyRG/gofermart/internal/model"
+	"github.com/SergeyRG/gofermart/internal/middleware"
+	"github.com/SergeyRG/gofermart/internal/migrations"
+	"github.com/SergeyRG/gofermart/internal/repositories"
 	"github.com/SergeyRG/gofermart/internal/services"
 	"github.com/go-chi/chi/v5"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
-var USERID model.UserID
+// @title           API для управления бонусным балансом Гофермарта
+// @version         1.0
+// @description     Сервис для управления балансом пользователей и просмотра заказов.
+// @host            localhost:8080
+// @BasePath        /api
 
+// @securityDefinitions.apikey CookieAuth
+// @in                         cookie
+// @name                       auth_token
 func main() {
-	USERID = 1 //TODO
 
 	// Инициализация логгера
 	err := logging.Initialize("DEBUG")
@@ -30,40 +44,86 @@ func main() {
 	cfg, err := config.NewConfig()
 	if err != nil {
 		l.Fatal(
-			"Сбой запуска приложения, не удалось ошибка конфигурации", zap.Error(err))
+			"Сбой запуска приложения, ошибка конфигурации", zap.Error(err))
 	}
 	l.Info("конфигурационная информация прочитана")
 
-	//Создаем сервис обработки заказов
-	orderSvc := services.OrderServiceImpl{}
+	l.Info("Обновление БД")
+	err = migrations.RunMigrations(cfg.DBDSN)
+	if err != nil {
+		l.Fatal(
+			"Сбой запуска приложения, не удалось выполнить миграцию схемы БД", zap.Error(err))
+	}
+	l.Info("Обновление БД завершено")
 
-	if err := run(cfg, orderSvc); err != nil {
-		log.Fatalf("ошибка запуска приложения: %v", err)
+	//Создание сервиса обработки заказов
+	db, err := repositories.CreateAndCheckPSQLCon(cfg.DBDSN)
+	if err != nil {
+		l.Fatal(
+			"Ошибка подключения к БД", zap.Error(err))
+	}
+	txManager := repositories.NewTXManager(db)
+
+	orderRepo := repositories.NewPSQLOrderRepo(db)
+	orderSvc := services.NewOrderService(orderRepo, txManager)
+
+	balanceRepo := repositories.NewPSQLBalanceRepo(db)
+	balanceSvc := services.NewBalanceService(balanceRepo, txManager)
+
+	accrualHTTPClient := clients.NewRestyAccrualClient(cfg)
+	accrualSvc := services.NewAccrualService(txManager, orderSvc, balanceSvc, accrualHTTPClient, 6)
+
+	userRepo := repositories.NewPSQLUserRepo(db)
+	userSvc := services.NewUserService(userRepo, txManager, balanceSvc)
+
+	g, gCtx := errgroup.WithContext(context.Background())
+
+	for workerID := range accrualSvc.WorkersCount {
+		g.Go(func() error {
+			return accrualSvc.RunWorker(gCtx, workerID)
+		})
+	}
+
+	g.Go(func() error {
+		if err := run(cfg, orderSvc, balanceSvc, userSvc); err != nil {
+			l.Error("ошибка запуска приложения", zap.Error(err))
+			return err
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		l.Fatal("критическая ошибка, повлекшая остановку приложения.", zap.Error(err))
 	}
 }
 
-func run(cfg config.Config, orderSvc services.OrderService) error {
+func run(cfg config.Config,
+	orderSvc services.OrderService,
+	balanceSvc services.BalanceService,
+	userSvc services.UserService) error {
+
 	l := logging.Logger
 	l.Info("Инициализация http сервера")
 
 	r := chi.NewRouter()
 
-	OrderHandler := handlers.NewOrderHandler(orderSvc)
+	jwtm := auth.NewJWTManager([]byte(cfg.SecretKey))
+	UserHandlers := handlers.NewUserHandler(userSvc, *jwtm)
+	r.Post("/api/user/register", UserHandlers.Register())
+	r.Post("/api/user/login", UserHandlers.Login())
 
-	r.Route("/", func(r chi.Router) {
-		// 	r.Use(logging.WithLogging)
-		// 	r.Use(authMiddleware)
-		// 	r.Use(middleware.GzipMiddleware)
-		// 	r.Post("/", rootHandler)
-		// 	r.Get("/{id}", redirectHandler)
-		// 	r.Get("/{id}/", redirectHandler)
-		// 	r.Get("/ping", DBPingHandler)
-		// 	r.Get("/ping/", DBPingHandler)
-		// 	r.Post("/api/shorten", JSONShortenHandler)
-		r.Post("/api/user/orders", OrderHandler.AddNewOrder())
-		// 	r.Get("/api/user/urls", UserURLHandler)
-		// 	r.Delete("/api/user/urls", UserBatchDeleteHandler)
+	StandardHandlers := handlers.NewStandardHandlers(orderSvc, balanceSvc)
+	authMiddleware := middleware.Auth(*jwtm)
+	r.Group(func(r chi.Router) {
+		r.Use(authMiddleware)
+		r.Get("/api/user/balance", StandardHandlers.GetUserBalance())
+		r.Post("/api/user/orders", StandardHandlers.AddNewOrder())
+		r.Get("/api/user/orders", StandardHandlers.GetUserOrders())
+		r.Post("/api/user/balance/withdraw", StandardHandlers.Withdraw())
+		r.Get("/api/user/withdrawals", StandardHandlers.GetWithdrawals())
 	})
+
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	server := &http.Server{
 		Addr:              cfg.ServerAddress,
@@ -77,31 +137,3 @@ func run(cfg config.Config, orderSvc services.OrderService) error {
 	l.Info("Запуск http сервера")
 	return server.ListenAndServe()
 }
-
-// func initRouter() chi.Router {
-
-// 	// redirectHandler := handler.RedirectHandler(svc)
-// 	// JSONShortenHandler := handler.JSONShortenHandler(svc)
-// 	// DBPingHandler := handler.DBPingHandler(db)
-// 	// BatchAddHandler := handler.BatchAddHandler(svc)
-// 	// UserURLHandler := handler.UserURLHandler(svc)
-// 	// UserBatchDeleteHandler := handler.UserBatchDeleteHandler(svc)
-
-// 	// authMiddleware := middleware.Auth(cfg)
-
-// 	// r.Route("/", func(r chi.Router) {
-// 	// 	r.Use(logging.WithLogging)
-// 	// 	r.Use(authMiddleware)
-// 	// 	r.Use(middleware.GzipMiddleware)
-// 	// 	r.Post("/", rootHandler)
-// 	// 	r.Get("/{id}", redirectHandler)
-// 	// 	r.Get("/{id}/", redirectHandler)
-// 	// 	r.Get("/ping", DBPingHandler)
-// 	// 	r.Get("/ping/", DBPingHandler)
-// 	// 	r.Post("/api/shorten", JSONShortenHandler)
-// 	// 	r.Post("/api/shorten/batch", BatchAddHandler)
-// 	// 	r.Get("/api/user/urls", UserURLHandler)
-// 	// 	r.Delete("/api/user/urls", UserBatchDeleteHandler)
-// 	// })
-// 	return chi.NewRouter()
-// }

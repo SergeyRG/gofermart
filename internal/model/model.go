@@ -1,7 +1,12 @@
 package model
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
+	"strconv"
 	"time"
 )
 
@@ -11,20 +16,54 @@ var ErrInvalidOrderID = errors.New(
 type OrderStatus string
 
 const (
-	StatusNew        OrderStatus = "NEW"        // заказ принят, но не обработан
-	StatusProcessing OrderStatus = "PROCESSING" // расчет в процессе
-	StatusInvalid    OrderStatus = "INVALID"    // система расчета признала номер неверным
-	StatusProcessed  OrderStatus = "PROCESSED"  // расчет завершен
+	StatusNew        OrderStatus = "NEW"
+	StatusProcessing OrderStatus = "PROCESSING"
+	StatusInvalid    OrderStatus = "INVALID"
+	StatusProcessed  OrderStatus = "PROCESSED"
+)
+
+type OperationType string
+
+const (
+	OperationWithdraw OperationType = "WITHDRAW"
+	OperationDeposit  OperationType = "DEPOSIT"
 )
 
 type UserID int64
+
+type User struct {
+	UserID  UserID `json:"-"`
+	Login   string `json:"login"`
+	PwdHash string `json:"password"`
+}
+
 type MoneyQty int64
 
-func (m MoneyQty) ToFloat() float64 {
-	return float64(m) / 100.0
+func (m MoneyQty) MarshalJSON() ([]byte, error) {
+	floatValue := float64(m) / 100.0
+	return []byte(fmt.Sprintf("%.2f", floatValue)), nil
+}
+
+func (m *MoneyQty) UnmarshalJSON(data []byte) error {
+	val, err := strconv.ParseFloat(string(data), 64)
+	if err != nil {
+		return fmt.Errorf("невалидное число: %w", err)
+	}
+
+	*m = MoneyQty(math.Round(val * 100))
+	return nil
 }
 
 type OrderID string
+
+func (o *OrderID) UnmarshalJSON(data []byte) error {
+	orderID, err := NewOrderID(string(bytes.Trim(data, "\"")))
+	if err != nil {
+		return err
+	}
+	*o = orderID
+	return nil
+}
 
 func (ID OrderID) isValid() bool {
 	var sum int
@@ -63,17 +102,58 @@ func NewOrderID(value string) (OrderID, error) {
 	return newID, nil
 }
 
-type User struct {
-	ID        UserID
-	Login     string
-	Current   MoneyQty
-	Withdrawn MoneyQty
+type Order struct {
+	ID        OrderID     `json:"number"`
+	UserID    UserID      `json:"-"`
+	Status    OrderStatus `json:"status"`
+	Accrual   MoneyQty    `json:"accrual"`
+	AddedAt   time.Time   `json:"uploaded_at"`
+	UpdatedAt time.Time   `json:"-"`
 }
 
-type Order struct {
-	ID      OrderID
-	UserID  UserID
-	Status  OrderStatus
-	Accrual MoneyQty
-	AddedAt time.Time
+func (o Order) MarshalJSON() ([]byte, error) {
+	type OrderCopy Order
+
+	var accrual *MoneyQty = nil
+
+	if o.Status == StatusProcessed {
+		accrual = &o.Accrual
+	}
+
+	jsonStruct := struct {
+		ID      OrderID     `json:"number"`
+		Status  OrderStatus `json:"status"`
+		Accrual *MoneyQty   `json:"accrual,omitempty"`
+		AddedAt time.Time   `json:"uploaded_at"`
+	}{
+		ID:      o.ID,
+		Status:  o.Status,
+		Accrual: accrual,
+		AddedAt: o.AddedAt,
+	}
+	return json.Marshal(jsonStruct)
+}
+
+func NewOrder(ID OrderID, userID UserID) Order {
+	return Order{
+		ID:        ID,
+		UserID:    userID,
+		Status:    StatusNew,
+		AddedAt:   time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+}
+
+type Balance struct {
+	UserID    UserID   `json:"-"`
+	Current   MoneyQty `json:"current"`
+	Withdrawn MoneyQty `json:"withdrawn"`
+}
+
+type Operation struct {
+	UserID      UserID        `json:"-"`
+	OrderID     OrderID       `json:"order"`
+	Sum         MoneyQty      `json:"sum"`
+	OpType      OperationType `json:"-"`
+	ProcessedAt time.Time     `json:"processed_at" swaggerignore:"true"`
 }
