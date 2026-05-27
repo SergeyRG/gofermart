@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"iter"
 
 	"github.com/SergeyRG/gofermart/internal/model"
 )
@@ -20,7 +21,7 @@ var ErrNoOrdersForProcessing = errors.New("нет заказов для обра
 //go:generate mockgen -destination=../mocks/mock_order_service.go -package=mocks . OrderService
 type OrderService interface {
 	AddOrder(context.Context, model.UserID, model.OrderID) error
-	GetUserOrders(context.Context, model.UserID) ([]model.Order, error)
+	GetUserOrders(context.Context, model.UserID) iter.Seq2[*model.Order, error]
 	ChangeOrderStatus(context.Context, model.OrderID, model.OrderStatus) error
 	GetByIDForUpdate(ctx context.Context, oID model.OrderID) (*model.Order, error)
 	GetNextOrderIDForProcessing(ctx context.Context) (*model.Order, error)
@@ -29,7 +30,7 @@ type OrderService interface {
 
 //go:generate mockgen -destination=../mocks/mock_order_repo.go -package=mocks . OrderRepo
 type OrderRepo interface {
-	GetByUserID(context.Context, model.UserID) ([]model.Order, error)
+	GetByUserID(context.Context, model.UserID) iter.Seq2[*model.Order, error]
 	GetByIDForUpdate(context.Context, model.OrderID) (*model.Order, error)
 	Add(context.Context, model.Order) error
 	//	GetOrdersForProccessing(context.Context) ([]model.OrderID, error)
@@ -49,7 +50,7 @@ func (svc OrderServiceImpl) AddOrder(ctx context.Context, userID model.UserID, o
 	return svc.orderRepo.Add(ctx, order)
 }
 
-func (svc OrderServiceImpl) GetUserOrders(ctx context.Context, userID model.UserID) ([]model.Order, error) {
+func (svc OrderServiceImpl) GetUserOrders(ctx context.Context, userID model.UserID) iter.Seq2[*model.Order, error] {
 	return svc.orderRepo.GetByUserID(ctx, userID)
 }
 

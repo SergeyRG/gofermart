@@ -70,18 +70,3 @@ func (mr *MockUserServiceMockRecorder) AuthUser(ctx, login, pwdHash any) *gomock
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthUser", reflect.TypeOf((*MockUserService)(nil).AuthUser), ctx, login, pwdHash)
 }
-
-// GetUserByLogin mocks base method.
-func (m *MockUserService) GetUserByLogin(ctx context.Context, login string) (*model.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserByLogin", ctx, login)
-	ret0, _ := ret[0].(*model.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUserByLogin indicates an expected call of GetUserByLogin.
-func (mr *MockUserServiceMockRecorder) GetUserByLogin(ctx, login any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByLogin", reflect.TypeOf((*MockUserService)(nil).GetUserByLogin), ctx, login)
-}

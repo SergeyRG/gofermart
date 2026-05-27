@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -93,24 +94,42 @@ func (h StandardHandlers) GetWithdrawals() http.HandlerFunc {
 			rw.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+		withdrawals := h.balanceSvc.GetUserWithdrawals(r.Context(), userID)
 
-		withdrawals, err := h.balanceSvc.GetUserWithdrawals(r.Context(), userID)
-		if err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
+		encoder := json.NewEncoder(rw)
+		isFirst := true
+		hasData := false
+
+		for op, err := range withdrawals {
+			if err != nil {
+				log.Printf("ошибка чтения данных из БД: %v", err)
+				return
+			}
+
+			if !hasData {
+				hasData = true
+				rw.Header().Set("Content-Type", "application/json")
+				rw.WriteHeader(http.StatusOK)
+				_, _ = rw.Write([]byte("["))
+			}
+
+			if !isFirst {
+				_, _ = rw.Write([]byte(","))
+			}
+			isFirst = false
+
+			if err := encoder.Encode(op); err != nil {
+				log.Printf("ошибка кодирования JSON: %v", err)
+				return
+			}
 		}
 
-		if len(withdrawals) == 0 {
+		if !hasData {
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
 
-		rw.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(rw).Encode(withdrawals)
-		if err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+		_, _ = rw.Write([]byte("]"))
 	}
 	return http.HandlerFunc(hf)
 }

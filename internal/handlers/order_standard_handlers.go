@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -68,29 +69,46 @@ func (h StandardHandlers) GetUserOrders() http.HandlerFunc {
 			rw.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-
 		defer r.Body.Close()
 
-		orders, err := h.orderSvc.GetUserOrders(r.Context(), userID)
-		if err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
+		orders := h.orderSvc.GetUserOrders(r.Context(), userID)
+
+		isFirst := true
+		hasData := false
+
+		for o, err := range orders {
+			if err != nil {
+				log.Printf("ошибка чтения данных из БД: %v", err)
+				return
+			}
+
+			if !hasData {
+				hasData = true
+				rw.Header().Set("Content-Type", "application/json")
+				rw.WriteHeader(http.StatusOK)
+				_, _ = rw.Write([]byte("["))
+			}
+
+			if !isFirst {
+				_, _ = rw.Write([]byte(",\n"))
+			}
+			isFirst = false
+
+			oJSON, err := json.Marshal(o)
+			if err != nil {
+				log.Printf("ошибка кодирования JSON: %v", err)
+				return
+			}
+			_, _ = rw.Write(oJSON)
+
 		}
 
-		if len(orders) == 0 {
+		if !hasData {
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
 
-		ordersJSON, err := json.Marshal(orders)
-		if err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		rw.Write(ordersJSON)
+		_, _ = rw.Write([]byte("]"))
 
 	}
 	return http.HandlerFunc(hf)

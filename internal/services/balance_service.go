@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 
 	"github.com/SergeyRG/gofermart/internal/model"
 )
@@ -16,7 +17,7 @@ type BalanceService interface {
 	AddUserBalance(context.Context, model.UserID) error
 	GetUserBalance(context.Context, model.UserID) (*model.Balance, error)
 	ExecOper(context.Context, model.Operation) (*model.Balance, error)
-	GetUserWithdrawals(ctx context.Context, userID model.UserID) ([]model.Operation, error)
+	GetUserWithdrawals(ctx context.Context, userID model.UserID) iter.Seq2[*model.Operation, error]
 }
 
 //go:generate mockgen -destination=../mocks/mock_balance_repo.go -package=mocks . BalanceRepo
@@ -26,7 +27,7 @@ type BalanceRepo interface {
 	ReduceBalance(context.Context, model.UserID, model.MoneyQty) (*model.Balance, error)
 	IncreaseBalance(context.Context, model.UserID, model.MoneyQty) (*model.Balance, error)
 	AddOperation(context.Context, model.Operation) error
-	GetWithdrawalsByUserID(context.Context, model.UserID) ([]model.Operation, error)
+	GetWithdrawalsByUserID(context.Context, model.UserID) iter.Seq2[*model.Operation, error]
 }
 
 type BalanceServiceImpl struct {
@@ -89,7 +90,7 @@ func (svc BalanceServiceImpl) ExecOper(ctx context.Context,
 	return newBalance, nil
 }
 
-func (svc BalanceServiceImpl) GetUserWithdrawals(ctx context.Context, userID model.UserID) ([]model.Operation, error) {
+func (svc BalanceServiceImpl) GetUserWithdrawals(ctx context.Context, userID model.UserID) iter.Seq2[*model.Operation, error] {
 	return svc.balanceRepo.GetWithdrawalsByUserID(ctx, userID)
 }
 

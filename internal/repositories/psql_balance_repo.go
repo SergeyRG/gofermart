@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"iter"
 
 	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/services"
@@ -118,34 +119,39 @@ func (repo PSQLBalanceRepo) AddOperation(
 	return nil
 }
 
-func (repo PSQLBalanceRepo) GetWithdrawalsByUserID(ctx context.Context, userID model.UserID) ([]model.Operation, error) {
-	qe := repo.GetExecutor(ctx)
-	query := `SELECT user_id, order_id, op_type, sum, processed_at 
+func (repo PSQLBalanceRepo) GetWithdrawalsByUserID(
+	ctx context.Context,
+	userID model.UserID) iter.Seq2[*model.Operation, error] {
+
+	return func(yield func(*model.Operation, error) bool) {
+		qe := repo.GetExecutor(ctx)
+		query := `SELECT user_id, order_id, op_type, sum, processed_at 
 			FROM operations WHERE user_id = $1 and op_type = 'WITHDRAW'`
 
-	rows, err := qe.QueryContext(ctx, query, userID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"ошибка выполнения SQL запроса: %w", err)
-	}
-	defer rows.Close()
-	withdrawals := make([]model.Operation, 0)
-	for rows.Next() {
-		o := model.Operation{}
-		err = rows.Scan(&o.UserID, &o.OrderID, &o.OpType, &o.Sum, &o.ProcessedAt)
+		rows, err := qe.QueryContext(ctx, query, userID)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"ошибка парсинга результата SQL запроса: %w", err)
+			yield(nil, fmt.Errorf("ошибка выполнения SQL запроса: %w", err))
+			return
 		}
-		withdrawals = append(withdrawals, o)
+		defer rows.Close()
+		for rows.Next() {
+			o := model.Operation{}
+			err = rows.Scan(&o.UserID, &o.OrderID, &o.OpType, &o.Sum, &o.ProcessedAt)
+			if err != nil {
+				yield(nil, fmt.Errorf(
+					"ошибка парсинга результата SQL запроса: %w", err))
+				return
+			}
+			if !yield(&o, nil) {
+				return
+			}
+		}
+		if err := rows.Err(); err != nil {
+			yield(nil, fmt.Errorf(
+				"ошибка чтения операций в БД: %w", err))
+			return
+		}
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf(
-			"ошибка записи операции в БД: %w", err)
-	}
-
-	return withdrawals, nil
 }
 
 func (repo PSQLBalanceRepo) AddUserBalance(

@@ -11,6 +11,7 @@ package mocks
 
 import (
 	context "context"
+	iter "iter"
 	reflect "reflect"
 
 	model "github.com/SergeyRG/gofermart/internal/model"
@@ -85,12 +86,11 @@ func (mr *MockBalanceRepoMockRecorder) GetByUserID(arg0, arg1 any) *gomock.Call 
 }
 
 // GetWithdrawalsByUserID mocks base method.
-func (m *MockBalanceRepo) GetWithdrawalsByUserID(arg0 context.Context, arg1 model.UserID) ([]model.Operation, error) {
+func (m *MockBalanceRepo) GetWithdrawalsByUserID(arg0 context.Context, arg1 model.UserID) iter.Seq2[*model.Operation, error] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetWithdrawalsByUserID", arg0, arg1)
-	ret0, _ := ret[0].([]model.Operation)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(iter.Seq2[*model.Operation, error])
+	return ret0
 }
 
 // GetWithdrawalsByUserID indicates an expected call of GetWithdrawalsByUserID.

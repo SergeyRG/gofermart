@@ -11,6 +11,7 @@ package mocks
 
 import (
 	context "context"
+	iter "iter"
 	reflect "reflect"
 
 	model "github.com/SergeyRG/gofermart/internal/model"
@@ -85,12 +86,11 @@ func (mr *MockOrderRepoMockRecorder) GetByIDForUpdate(arg0, arg1 any) *gomock.Ca
 }
 
 // GetByUserID mocks base method.
-func (m *MockOrderRepo) GetByUserID(arg0 context.Context, arg1 model.UserID) ([]model.Order, error) {
+func (m *MockOrderRepo) GetByUserID(arg0 context.Context, arg1 model.UserID) iter.Seq2[*model.Order, error] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByUserID", arg0, arg1)
-	ret0, _ := ret[0].([]model.Order)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(iter.Seq2[*model.Order, error])
+	return ret0
 }
 
 // GetByUserID indicates an expected call of GetByUserID.

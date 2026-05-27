@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"iter"
 
 	"github.com/SergeyRG/gofermart/internal/model"
 	"github.com/SergeyRG/gofermart/internal/services"
@@ -67,38 +68,42 @@ func (repo PSQLOrderRepo) Add(ctx context.Context, order model.Order) error {
 	}
 }
 
-func (repo PSQLOrderRepo) GetByUserID(ctx context.Context, userID model.UserID) ([]model.Order, error) {
-	qe := repo.GetExecutor(ctx)
-	query := `SELECT id, status, COALESCE(accrual, 0), added_at
+func (repo PSQLOrderRepo) GetByUserID(ctx context.Context, userID model.UserID) iter.Seq2[*model.Order, error] {
+	return func(yield func(*model.Order, error) bool) {
+
+		qe := repo.GetExecutor(ctx)
+		query := `SELECT id, status, COALESCE(accrual, 0), added_at
 			FROM orders
 			WHERE user_id = $1
 			ORDER BY added_at DESC`
 
-	orders := make([]model.Order, 0)
+		sqlResults, err := qe.QueryContext(ctx, query, userID)
 
-	sqlResults, err := qe.QueryContext(ctx, query, userID)
-
-	if err != nil {
-		return nil, fmt.Errorf(
-			"ошибка выполнения SQL запроса: %w", err)
-	}
-	defer sqlResults.Close()
-
-	for sqlResults.Next() {
-		o := model.Order{}
-		err = sqlResults.Scan(&o.ID, &o.Status, &o.Accrual, &o.AddedAt)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"ошибка парсинга результата SQL запроса: %w", err)
+			yield(nil, fmt.Errorf(
+				"ошибка выполнения SQL запроса: %w", err))
+			return
 		}
-		orders = append(orders, o)
-	}
+		defer sqlResults.Close()
 
-	if err = sqlResults.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка парсинга результата SQL запроса: %w", err)
-	}
+		for sqlResults.Next() {
+			o := model.Order{}
+			err = sqlResults.Scan(&o.ID, &o.Status, &o.Accrual, &o.AddedAt)
+			if err != nil {
+				yield(nil, fmt.Errorf(
+					"ошибка парсинга результата SQL запроса: %w", err))
+				return
+			}
+			if !yield(&o, nil) {
+				return
+			}
+		}
 
-	return orders, nil
+		if err = sqlResults.Err(); err != nil {
+			yield(nil, fmt.Errorf("ошибка парсинга результата SQL запроса: %w", err))
+			return
+		}
+	}
 }
 
 func (repo PSQLOrderRepo) ChangeOrderStatus(ctx context.Context, oID model.OrderID, oStatus model.OrderStatus) error {
