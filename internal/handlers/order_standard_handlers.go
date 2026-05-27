@@ -79,6 +79,9 @@ func (h StandardHandlers) GetUserOrders() http.HandlerFunc {
 		for o, err := range orders {
 			if err != nil {
 				log.Printf("ошибка чтения данных из БД: %v", err)
+				if !hasData {
+					rw.WriteHeader(http.StatusInternalServerError)
+				}
 				return
 			}
 

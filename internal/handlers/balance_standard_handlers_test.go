@@ -69,7 +69,6 @@ func TestStandardHandlers_GetUserBalance(t *testing.T) {
 			ctx:               auth.ContextWithUserID(context.Background(), model.UserID(1)),
 			setupOrderSvcMock: func(m *mocks.MockOrderService) {},
 			setupBalanceSvcMock: func(m *mocks.MockBalanceService) {
-
 				m.EXPECT().GetUserBalance(gomock.Any(), model.UserID(1)).
 					Return(positiveCaseBalance, nil).
 					Times(1)
@@ -269,6 +268,17 @@ func TestStandardHandlers_Withdraw(t *testing.T) {
 
 func TestStandardHandlers_GetWithdrawals(t *testing.T) {
 	endpoint := "/api/user/withdrawals"
+	IteratorWithError := func(yield func(*model.Operation, error) bool) {
+		yield(nil, errors.New("test"))
+	}
+	IteratorEmpty := func(yield func(*model.Operation, error) bool) {}
+	IteratorPositiv := func(yield func(*model.Operation, error) bool) {
+		yield(&model.Operation{
+			OrderID:     "2377225624",
+			Sum:         100,
+			ProcessedAt: time.Time{},
+		}, nil)
+	}
 	tests := []struct {
 		name                string
 		ctx                 context.Context
@@ -296,7 +306,7 @@ func TestStandardHandlers_GetWithdrawals(t *testing.T) {
 			setupBalanceSvcMock: func(m *mocks.MockBalanceService) {
 				m.EXPECT().
 					GetUserWithdrawals(gomock.Any(), model.UserID(1)).
-					Times(1).Return(nil, errors.New("тест"))
+					Times(1).Return(IteratorWithError)
 			},
 			setupRequest: func(r *http.Request) {},
 			wantStatus:   http.StatusInternalServerError,
@@ -310,7 +320,7 @@ func TestStandardHandlers_GetWithdrawals(t *testing.T) {
 			setupBalanceSvcMock: func(m *mocks.MockBalanceService) {
 				m.EXPECT().
 					GetUserWithdrawals(gomock.Any(), model.UserID(1)).
-					Times(1).Return([]model.Operation{}, nil)
+					Times(1).Return(IteratorEmpty)
 			},
 			setupRequest: func(r *http.Request) {},
 			wantStatus:   http.StatusNoContent,
@@ -324,13 +334,7 @@ func TestStandardHandlers_GetWithdrawals(t *testing.T) {
 			setupBalanceSvcMock: func(m *mocks.MockBalanceService) {
 				m.EXPECT().
 					GetUserWithdrawals(gomock.Any(), model.UserID(1)).
-					Times(1).Return([]model.Operation{
-					{
-						OrderID:     "2377225624",
-						Sum:         100,
-						ProcessedAt: time.Time{},
-					},
-				}, nil)
+					Times(1).Return(IteratorPositiv)
 			},
 			setupRequest: func(r *http.Request) {},
 			wantStatus:   http.StatusOK,

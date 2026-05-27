@@ -103,6 +103,9 @@ func (h StandardHandlers) GetWithdrawals() http.HandlerFunc {
 		for op, err := range withdrawals {
 			if err != nil {
 				log.Printf("ошибка чтения данных из БД: %v", err)
+				if !hasData {
+					rw.WriteHeader(http.StatusInternalServerError)
+				}
 				return
 			}
 
